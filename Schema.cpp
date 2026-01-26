@@ -6,14 +6,14 @@
 #include "Pager.h"
 
 
-Column::Column(const string &name, Type type, size_t size, size_t offset)
+Column::Column(const string &name, Type type, uint32_t size, uint32_t offset)
     : columnName(name), type(type), size(size), offset(offset) {}
 
 Column::~Column(){}
 
 Row::Row(const vector<Column*> &schema){
     for(Column* c : schema){
-        if(c->type == INT) value[c->columnName] = malloc(sizeof(int));
+        if(c->type == INT) value[c->columnName] = malloc(sizeof(int32_t));
         else value[c->columnName] = malloc(c->size);
     }
 }   
@@ -26,7 +26,7 @@ Table::Table(const string &name, const string &meta)
     : tableName(name), rowCount(0), rowSize(ROW_HEADER_SIZE), rowsPerPage(0), metaName(meta), pager(new Pager(meta+"_"+name+".db"))
 {}
 
-Table::Table(const string &name, const string &meta, int rowCount) 
+Table::Table(const string &name, const string &meta, uint32_t rowCount) 
     : tableName(name), rowCount(rowCount), rowSize(ROW_HEADER_SIZE), metaName(meta), pager(new Pager(meta+"_"+name+".db"))
 {
     while(!freeList.empty()) freeList.pop();
@@ -44,17 +44,17 @@ Table::~Table(){
 
 Row* Table::ParseRow(stringstream &ss){
     string str;
-    int num;
+    int32_t num;
 
     Row* r = new Row(schema);
     for(Column* c : schema){
         if(c->type == INT){
             ss >> num;
-            *(int*)(r->value[c->columnName]) = num;
+            *(int32_t*)(r->value[c->columnName]) = num;
         }
         else{
             ss >> quoted(str);
-            size_t len = min(str.size(), c->size-1);
+            uint32_t len = min((uint32_t)str.size(), c->size-1);
             void* dest = r->value[c->columnName];
             memset(dest, 0, c->size);
             memcpy(dest, &str[0], len);
@@ -93,14 +93,14 @@ void Table::AddColumn(Column* c){
     rowsPerPage = PAGE_SIZE / rowSize; 
 }
 
-void* Table::RowSlot(int rowNum){
-    int pageNum = rowNum / rowsPerPage;
+void* Table::RowSlot(uint32_t rowId){
+    uint32_t pageNum = rowId / rowsPerPage;
 
     void* page = pager->GetPage(pageNum);
 
     if(page == nullptr) return nullptr;
 
-    int offset = rowNum % rowsPerPage * rowSize;
+    uint16_t offset = rowId % rowsPerPage * rowSize;
 
     return (char*)page + offset;
 }
@@ -120,14 +120,14 @@ void Table::CreateIndex(const string& columnName){
     
 }
 
-bool Table::IsRowDeleted(int rowId){
+bool Table::IsRowDeleted(uint32_t rowId){
     void* slot = RowSlot(rowId);
     if (!slot) return true;
     uint8_t flag = *(uint8_t*)slot;
     return (flag == 1);
 }
 
-void Table::MarkRowDeleted(int rowId){
+void Table::MarkRowDeleted(uint32_t rowId){
     void* slot = RowSlot(rowId);
     if (!slot) return;
 
@@ -137,9 +137,9 @@ void Table::MarkRowDeleted(int rowId){
     freeList.push(rowId);
 }
 
-int Table::GetNextRowId() {
+uint32_t Table::GetNextRowId() {
     if (!freeList.empty()) {
-        int id = freeList.top();
+        uint32_t id = freeList.top();
         freeList.pop();
         return id;
     }

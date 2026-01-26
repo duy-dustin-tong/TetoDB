@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 
+
 using namespace std;
 
 Pager::Pager(const std::string& filename){
@@ -42,11 +43,11 @@ Pager::Pager(const std::string& filename){
 }
 
 Pager::~Pager(){
-    for(int i = 0;i<numPages; i++) free(pages[i]);
+    for(uint32_t i = 0;i<numPages; i++) free(pages[i]);
     close(fileDescriptor);
 }
 
-void* Pager::GetPage(int pageNum){
+void* Pager::GetPage(uint32_t pageNum){
     if(pageNum > numPages){
         std::cerr << "Error: Tried to fetch page number out of bounds." << std::endl;
         return nullptr;
@@ -59,7 +60,7 @@ void* Pager::GetPage(int pageNum){
     }
 
     void* page = malloc(PAGE_SIZE);
-    int numPagesStored = fileLength / PAGE_SIZE;
+    uint32_t numPagesStored = fileLength / PAGE_SIZE;
 
     if(pageNum <= numPagesStored){
         lseek(fileDescriptor, pageNum * PAGE_SIZE, SEEK_SET);
@@ -75,7 +76,7 @@ void* Pager::GetPage(int pageNum){
     return pages[pageNum];
 }
 
-void Pager::Flush(int pageNum, size_t size){
+void Pager::Flush(uint32_t pageNum, uint32_t size){
     if(pages[pageNum] == nullptr) return;
 
     off_t offset = lseek(fileDescriptor, pageNum * PAGE_SIZE, SEEK_SET);
@@ -90,17 +91,17 @@ void Pager::Flush(int pageNum, size_t size){
         return;
     }
 
-    fileLength = max(fileLength, (size_t)(pageNum + 1) * PAGE_SIZE);
+    fileLength = max(fileLength, (uint32_t)(pageNum + 1) * PAGE_SIZE);
     _commit(fileDescriptor);
 }
 
 void Pager::FlushAll(){
-    for(int i = 0; i < numPages; i++){
+    for(uint32_t i = 0; i < numPages; i++){
         if(pages[i]) Flush(i, PAGE_SIZE);
     }
 }
 
-int Pager::GetUnusedPageNum(){
+uint32_t Pager::GetUnusedPageNum(){
     pages.push_back(nullptr);
     return numPages++;
 }

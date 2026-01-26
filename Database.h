@@ -20,9 +20,9 @@ public:
     Result DropTable(const string& name);
     Result Insert(const string& name, stringstream& ss);
     void SelectAll(Table* t, vector<Row*> &res);
-    int DeleteAll(Table* t);
-    void SelectWithRange(Table* t, const string& columnName, int L, int R, vector<Row*>& res);
-    int DeleteWithRange(Table* t, const string& columnName, int L, int R);
+    uint32_t DeleteAll(Table* t);
+    void SelectWithRange(Table* t, const string& columnName, int32_t L, int32_t R, vector<Row*>& res);
+    uint32_t DeleteWithRange(Table* t, const string& columnName, int32_t L, int32_t R);
     void Commit();
     void LoadFromMeta();
     void FlushToMeta();

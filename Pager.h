@@ -4,6 +4,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 
 using namespace std;
 
@@ -17,14 +18,14 @@ public:
     Pager(const string& filename);
     ~Pager();
 
-    void* GetPage(int pageNum);
-    void Flush(int pageNum, size_t size);
+    void* GetPage(uint32_t pageNum);
+    void Flush(uint32_t pageNum, uint32_t size);
     void FlushAll();
-    int GetUnusedPageNum(); 
+    uint32_t GetUnusedPageNum(); 
 public:
     vector<void*> pages;
-    int fileDescriptor;
-    int numPages;
-    size_t fileLength;
+    uint32_t fileDescriptor;
+    uint32_t numPages;
+    uint32_t fileLength;
     
 };

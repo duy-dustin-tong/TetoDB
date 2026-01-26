@@ -24,7 +24,7 @@ void PrintTable(const vector<Row*>& rows, Table* t) {
     for (int w : widths) cout << string(w + 2, '-') << "+";
     cout << endl << "|";
     
-    for (size_t i = 0; i < t->schema.size(); i++) {
+    for (uint32_t i = 0; i < t->schema.size(); i++) {
         cout << " " << left << setw(widths[i]) << t->schema[i]->columnName << " |";
     }
     cout << endl << "+";
@@ -34,7 +34,7 @@ void PrintTable(const vector<Row*>& rows, Table* t) {
     // 3. Print Rows
     for (Row* r : rows) {
         cout << "|";
-        for (size_t i = 0; i < t->schema.size(); i++) {
+        for (uint32_t i = 0; i < t->schema.size(); i++) {
             Column* c = t->schema[i];
             if (c->type == INT) {
                 cout << " " << left << setw(widths[i]) << *(int*)r->value[c->columnName] << " |";
@@ -53,7 +53,7 @@ void PrintTable(const vector<Row*>& rows, Table* t) {
     cout << rows.size() << " rows in set." << endl;
 }
 
-void ProcessDotCommand(string &line){
+void ProcessDotCommand(const string &line){
     stringstream ss;
     ss << line;
 
@@ -96,7 +96,7 @@ void ProcessDotCommand(string &line){
     }
 } 
 
-void ExecuteCommand(string &line){
+void ExecuteCommand(const string &line){
     if(line.empty()) return;
 
     if(line[0] == '.') { ProcessDotCommand(line); return; }
@@ -127,7 +127,7 @@ void ExecuteCommand(string &line){
         }
 
         stringstream ss;
-        for(size_t i = 0; i < cmd.args.size(); i++){
+        for(uint32_t i = 0; i < cmd.args.size(); i++){
              // Check if we are within schema bounds
              if(i < t->schema.size()) {
                  // ONLY quote if it is a STRING. Integers must be raw.
@@ -154,8 +154,8 @@ void ExecuteCommand(string &line){
         } else {
             // Args are [col, min, max]
             string col = cmd.args[0];
-            int l = stoi(cmd.args[1]);
-            int r = stoi(cmd.args[2]);
+            int32_t l = stoi(cmd.args[1]);
+            int32_t r = stoi(cmd.args[2]);
             DB_INSTANCE->SelectWithRange(t, col, l, r, rows);
         }
         
@@ -165,14 +165,14 @@ void ExecuteCommand(string &line){
         Table* t = DB_INSTANCE->GetTable(cmd.tableName);
         if (!t) { cout << "Error: Table '" << cmd.tableName << "' not found." << endl; return; }
 
-        int deletedCount = 0;
+        uint32_t deletedCount = 0;
         if (cmd.args.empty()) {
             deletedCount = DB_INSTANCE->DeleteAll(t);
         } else {
             // Args are [col, min, max]
             string col = cmd.args[0];
-            int l = stoi(cmd.args[1]);
-            int r = stoi(cmd.args[2]);
+            int32_t l = stoi(cmd.args[1]);
+            int32_t r = stoi(cmd.args[2]);
             deletedCount = DB_INSTANCE->DeleteWithRange(t, col, l, r);
         }
 

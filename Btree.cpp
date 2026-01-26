@@ -9,8 +9,8 @@
 #include <iostream>
 
 
-void CreateNewRoot(NodeHeader* root, Pager* pager, int32_t splitKey, int32_t splitRowId, int32_t rightChildPageNum){
-    int leftChildPageNum = pager->GetUnusedPageNum();
+void CreateNewRoot(NodeHeader* root, Pager* pager, int32_t splitKey, uint32_t splitRowId, uint32_t rightChildPageNum){
+    uint32_t leftChildPageNum = pager->GetUnusedPageNum();
     NodeHeader* leftChild = (NodeHeader*)pager->GetPage(leftChildPageNum);
 
     memcpy(leftChild, root, INTERNAL_NODE_SIZE);
@@ -48,13 +48,13 @@ void InitializeLeafNode(LeafNode* node){
     memset(node->cells, 0, LEAF_NODE_SIZE - HEADER_SIZE);
 }
 
-uint16_t LeafNodeFindSlot(LeafNode* node, int32_t targetKey, int32_t targetRowId){
-    uint32_t l = 0;
-    uint32_t r = node->header.numCells;
+uint16_t LeafNodeFindSlot(LeafNode* node, int32_t targetKey, uint32_t targetRowId){
+    uint16_t l = 0;
+    uint16_t r = node->header.numCells;
 
     while(l<r){
-        uint32_t mid = l+r>>1;
-        uint32_t midKey = node->cells[mid].key;
+        uint16_t mid = l+r>>1;
+        int32_t midKey = node->cells[mid].key;
         uint32_t midRowId = node->cells[mid].rowId;
         if(targetKey < midKey || (targetKey == midKey && targetRowId < midRowId)) r = mid;
         else l = mid+1;
@@ -63,14 +63,14 @@ uint16_t LeafNodeFindSlot(LeafNode* node, int32_t targetKey, int32_t targetRowId
     return l;
 }
 
-uint32_t InternalNodeFindChild(InternalNode* node, int32_t targetKey, int32_t targetRowId){
-    uint32_t l = 0;
-    uint32_t r = node->header.numCells;
+uint32_t InternalNodeFindChild(InternalNode* node, int32_t targetKey, uint32_t targetRowId){
+    uint16_t l = 0;
+    uint16_t r = node->header.numCells;
 
     while(l<r){
-        uint32_t mid = l+r>>1;
+        uint16_t mid = l+r>>1;
         int32_t midKey = node->cells[mid].key;
-        int32_t midRowId = node->cells[mid].rowId;
+        uint32_t midRowId = node->cells[mid].rowId;
         if(targetKey < midKey || (targetKey == midKey && targetRowId < midRowId)) r=mid;
         else l = mid+1;
     }
@@ -79,7 +79,7 @@ uint32_t InternalNodeFindChild(InternalNode* node, int32_t targetKey, int32_t ta
     return node->cells[l].childPage;
 }
 
-uint32_t BtreeFindLeaf(Pager* pager, uint32_t pageNum, int32_t key, int32_t rowId){
+uint32_t BtreeFindLeaf(Pager* pager, uint32_t pageNum, int32_t key, uint32_t rowId){
     void* node = pager->GetPage(pageNum);
     NodeHeader* header = (NodeHeader*) node;
 
@@ -91,9 +91,7 @@ uint32_t BtreeFindLeaf(Pager* pager, uint32_t pageNum, int32_t key, int32_t rowI
     return BtreeFindLeaf(pager, childPageNum, key, rowId); 
 }
 
-
-
-void UpdateChildParents(Pager* pager, InternalNode* parentNode, int32_t parentPageNum){
+void UpdateChildParents(Pager* pager, InternalNode* parentNode, uint32_t parentPageNum){
     void* child = pager->GetPage(parentNode->rightChild);
     ((NodeHeader*)child)->parent = parentPageNum;
 
@@ -103,8 +101,8 @@ void UpdateChildParents(Pager* pager, InternalNode* parentNode, int32_t parentPa
     }
 }
 
-void InsertIntoParent(Pager* pager, NodeHeader* leftChild, int32_t key, int32_t rowId, uint32_t rightChildPageNum){
-    int parentPageNum = leftChild->parent;
+void InsertIntoParent(Pager* pager, NodeHeader* leftChild, int32_t key, uint32_t rowId, uint32_t rightChildPageNum){
+    uint32_t parentPageNum = leftChild->parent;
 
     if(parentPageNum == 0){
         InternalNode* root = (InternalNode*)pager->GetPage(0);
@@ -126,15 +124,14 @@ void InsertIntoParent(Pager* pager, NodeHeader* leftChild, int32_t key, int32_t 
     }
 }
 
-
-bool LeafNodeInsertNonFull(Table* t, LeafNode* node, int32_t key, int32_t rowId){
-    uint32_t slot = LeafNodeFindSlot(node, key, rowId);
+bool LeafNodeInsertNonFull(Table* t, LeafNode* node, int32_t key, uint32_t rowId){
+    uint16_t slot = LeafNodeFindSlot(node, key, rowId);
     bool isDeleted = t->IsRowDeleted(node->cells[slot].rowId);
 
     if(node->header.numCells >= LEAF_NODE_MAX_CELLS && !isDeleted) return 0;
 
     if(!isDeleted){
-        int cellsToMove = node->header.numCells - slot;
+        uint16_t cellsToMove = node->header.numCells - slot;
         if(cellsToMove > 0){
             void* src = &node->cells[slot];
             void* dest = &node->cells[slot+1];
@@ -148,12 +145,12 @@ bool LeafNodeInsertNonFull(Table* t, LeafNode* node, int32_t key, int32_t rowId)
     return 1;
 }
 
-InsertResult LeafNodeInsert(Table* t, LeafNode* node, Pager* pager, int32_t key, int32_t rowId){
+InsertResult LeafNodeInsert(Table* t, LeafNode* node, Pager* pager, int32_t key, uint32_t rowId){
 
     if(LeafNodeInsertNonFull(t, node, key, rowId)) return {true, false, 0, 0, 0};
 
 
-    int newPageNum = pager->GetUnusedPageNum();
+    uint32_t newPageNum = pager->GetUnusedPageNum();
     
     LeafNode* rightNode = (LeafNode*) pager->GetPage(newPageNum);
     InitializeLeafNode(rightNode);
@@ -163,8 +160,8 @@ InsertResult LeafNodeInsert(Table* t, LeafNode* node, Pager* pager, int32_t key,
     rightNode->nextLeaf = node->nextLeaf;
     node->nextLeaf = newPageNum;
 
-    int splitIdx = (LEAF_NODE_MAX_CELLS+1)/2;
-    int cellsMoved = node->header.numCells-splitIdx;
+    uint16_t splitIdx = (LEAF_NODE_MAX_CELLS+1)/2;
+    uint16_t cellsMoved = node->header.numCells-splitIdx;
 
     void* src = &node->cells[splitIdx];
     void* dest = &rightNode->cells[0];
@@ -174,29 +171,27 @@ InsertResult LeafNodeInsert(Table* t, LeafNode* node, Pager* pager, int32_t key,
     rightNode->header.numCells = cellsMoved;
 
     int32_t splitKey = rightNode->cells[0].key;
-    int32_t splitRowId = rightNode->cells[0].rowId;
+    uint32_t splitRowId = rightNode->cells[0].rowId;
 
     if(key>=splitKey) LeafNodeInsertNonFull(t, rightNode, key, rowId);
     else LeafNodeInsertNonFull(t, node, key, rowId);
 
     
 
-    return {true, true, splitKey, splitRowId, (uint32_t)newPageNum};
+    return {true, true, splitKey, splitRowId, newPageNum};
 
-
-    
 }
 
-InsertResult InternalNodeInsert(InternalNode* node, Pager* pager, int32_t key, int32_t rowId, uint32_t rightChildPage){
+InsertResult InternalNodeInsert(InternalNode* node, Pager* pager, int32_t key, uint32_t rowId, uint32_t rightChildPage){
     if(node->header.numCells < INTERNAL_NODE_MAX_CELLS){
-        uint32_t i = 0;
+        uint16_t i = 0;
         while(i < node->header.numCells){
             bool targetIsSmaller = (key < node->cells[i].key) || (key == node->cells[i].key && rowId < node->cells[i].rowId);
             if(targetIsSmaller) break;
             i++;
         }
 
-        for(uint32_t j = node->header.numCells; j > i; j--){
+        for(uint16_t j = node->header.numCells; j > i; j--){
             node->cells[j] = node->cells[j-1];
         }
         
@@ -217,7 +212,7 @@ InsertResult InternalNodeInsert(InternalNode* node, Pager* pager, int32_t key, i
         return {true, false, 0, 0, 0};
     }
 
-    int newPageNum = pager->GetUnusedPageNum();
+    uint32_t newPageNum = pager->GetUnusedPageNum();
     InternalNode* rightNode = (InternalNode*)pager->GetPage(newPageNum);
 
     rightNode->header.type = INTERNAL;
@@ -225,14 +220,14 @@ InsertResult InternalNodeInsert(InternalNode* node, Pager* pager, int32_t key, i
     rightNode->header.numCells = 0;
     rightNode->header.parent = node->header.parent;
 
-    int splitIdx = INTERNAL_NODE_MAX_CELLS/2;
+    uint16_t splitIdx = INTERNAL_NODE_MAX_CELLS/2;
 
     int32_t promotedKey = node->cells[splitIdx].key;
-    int32_t promotedRowId = node->cells[splitIdx].rowId;
+    uint32_t promotedRowId = node->cells[splitIdx].rowId;
 
     uint32_t leftNewRightChild = node->cells[splitIdx].childPage;
 
-    int cellsMoved = node->header.numCells - splitIdx - 1;
+    uint16_t cellsMoved = node->header.numCells - splitIdx - 1;
 
     memcpy(rightNode->cells, &node->cells[splitIdx+1], cellsMoved*sizeof(InternalCell));
 
@@ -252,12 +247,12 @@ InsertResult InternalNodeInsert(InternalNode* node, Pager* pager, int32_t key, i
 
     UpdateChildParents(pager, rightNode, newPageNum);
 
-    return {true, true, promotedKey, promotedRowId, (uint32_t)newPageNum};
+    return {true, true, promotedKey, promotedRowId, newPageNum};
 }
 
-void LeafNodeSelectRange(Table* t, LeafNode* node, int L, int R, vector<int>& outRowIds){
-    int p = 0;
-    for(int q = 0;q<node->header.numCells;q++){
+void LeafNodeSelectRange(Table* t, LeafNode* node, int32_t L, int32_t R, vector<uint32_t>& outRowIds){
+    uint16_t p = 0;
+    for(uint16_t q = 0;q<node->header.numCells;q++){
         uint32_t rowId = node->cells[q].rowId;
         if(t->IsRowDeleted(rowId)) continue;
 
@@ -272,10 +267,10 @@ void LeafNodeSelectRange(Table* t, LeafNode* node, int L, int R, vector<int>& ou
 
 }
 
-int LeafNodeDeleteRange(Table* t, LeafNode* node, int32_t L, int32_t R){
-    int p = 0;
-    int deletedCount = 0;
-    for(int q = 0;q<node->header.numCells;q++){
+uint16_t LeafNodeDeleteRange(Table* t, LeafNode* node, int32_t L, int32_t R){
+    uint16_t p = 0;
+    uint16_t deletedCount = 0;
+    for(uint16_t q = 0;q<node->header.numCells;q++){
         uint32_t rowId = node->cells[q].rowId;
         if(t->IsRowDeleted(rowId)) continue;
 
@@ -295,9 +290,9 @@ int LeafNodeDeleteRange(Table* t, LeafNode* node, int32_t L, int32_t R){
     return deletedCount;
 }
 
-int BtreeDelete(Table* t, Pager* pager, int32_t L, int32_t R){
+uint32_t BtreeDelete(Table* t, Pager* pager, int32_t L, int32_t R){
     uint32_t leafPageNum = BtreeFindLeaf(pager,0,L,0);
-    int deletedCount = 0;
+    uint32_t deletedCount = 0;
     bool firstPage = 1;
     
     while(leafPageNum != 0 || (firstPage && leafPageNum == 0)){

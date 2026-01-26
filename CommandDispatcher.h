@@ -5,7 +5,9 @@
 #include "Common.h"
 
 class Database;
+class Table;
+class Row;
 
-
-void ExecuteCommand(string &line);
-void ProcessDotCommand(string &line);
+void PrintTable(const vector<Row*>& rows, Table* t);
+void ExecuteCommand(const string &line);
+void ProcessDotCommand(const string &line);

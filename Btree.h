@@ -21,12 +21,12 @@ struct NodeHeader{
 
 struct LeafCell{
     int32_t key;
-    int32_t rowId;
+    uint32_t rowId;
 };
 
 struct InternalCell{
     int32_t key;
-    int32_t rowId;
+    uint32_t rowId;
     uint32_t childPage;
 };
 
@@ -46,23 +46,23 @@ struct InsertResult{
     bool success;
     bool didSplit;
     int32_t splitKey;
-    int32_t splitRowId;
+    uint32_t splitRowId;
     uint32_t rightChildPageNum;
 };
 
-void CreateNewRoot(NodeHeader* root, Pager* pager, int32_t splitKey, int32_t splitRowId, int32_t rightChildPageNum);
+void CreateNewRoot(NodeHeader* root, Pager* pager, int32_t splitKey, uint32_t splitRowId, uint32_t rightChildPageNum);
 void InitializeLeafNode(LeafNode* node);
-bool LeafNodeInsertNonFull(Table* t, LeafNode* node, int32_t key, int32_t rowId);
-InsertResult LeafNodeInsert(Table* t, LeafNode* node, Pager* pager, int32_t key, int32_t rowId);
-InsertResult InternalNodeInsert(InternalNode* node, Pager* pager, int32_t key, int32_t rowId, uint32_t rigthChildPage);
-uint16_t LeafNodeFindSlot(LeafNode* node, int32_t targetKey, int32_t targetRowId);
-uint32_t InternalNodeFindChild(InternalNode* node, int32_t targetKey, int32_t targetRowId);
-uint32_t BtreeFindLeaf(Pager* pager, uint32_t pageNum, int32_t key, int32_t rowId);
-void LeafNodeSelectRange(Table* t, LeafNode* node, int L, int R, vector<int>& outRowIds);
-void UpdateChildParents(Pager* pager, InternalNode* parentNode, int32_t parentPageNum);
-void InsertIntoParent(Pager* pager, NodeHeader* leftChild, int32_t key, int32_t rowId, uint32_t rightChildPageNum);
-int BtreeDelete(Table* t, Pager* pager, int32_t L, int32_t R);
-int LeafNodeDeleteRange(Table* t, LeafNode* node, int32_t L, int32_t R);
+bool LeafNodeInsertNonFull(Table* t, LeafNode* node, int32_t key, uint32_t rowId);
+InsertResult LeafNodeInsert(Table* t, LeafNode* node, Pager* pager, int32_t key, uint32_t rowId);
+InsertResult InternalNodeInsert(InternalNode* node, Pager* pager, int32_t key, uint32_t rowId, uint32_t rigthChildPage);
+uint16_t LeafNodeFindSlot(LeafNode* node, int32_t targetKey, uint32_t targetRowId);
+uint32_t InternalNodeFindChild(InternalNode* node, int32_t targetKey, uint32_t targetRowId);
+uint32_t BtreeFindLeaf(Pager* pager, uint32_t pageNum, int32_t key, uint32_t rowId);
+void LeafNodeSelectRange(Table* t, LeafNode* node, int32_t L, int32_t R, vector<uint32_t>& outRowIds);
+void UpdateChildParents(Pager* pager, InternalNode* parentNode, uint32_t parentPageNum);
+void InsertIntoParent(Pager* pager, NodeHeader* leftChild, int32_t key, uint32_t rowId, uint32_t rightChildPageNum);
+uint32_t BtreeDelete(Table* t, Pager* pager, int32_t L, int32_t R);
+uint16_t LeafNodeDeleteRange(Table* t, LeafNode* node, int32_t L, int32_t R);
 
 //const uint32_t NODE_SIZE = 4096;
 const uint32_t LEAF_NODE_SIZE = 4096;

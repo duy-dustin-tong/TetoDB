@@ -33,7 +33,7 @@ Result Database::CreateTable(const string& tableName, stringstream& ss){
     tables[tableName] = t;
 
     string name, type;
-    size_t size, offset;
+    uint32_t size, offset;
     offset = Table::ROW_HEADER_SIZE;
     
 
@@ -75,7 +75,7 @@ Result Database::Insert(const string& name, stringstream& ss){
     if(!r) return Result::INVALID_SCHEMA;
     
 
-    int newRowId = t->GetNextRowId();
+    uint32_t newRowId = t->GetNextRowId();
     //cout<<"new row id "<<newRowId<<endl;
 
     
@@ -122,8 +122,8 @@ void Database::SelectAll(Table* t, vector<Row*>& res){
     }
 }
 
-int Database::DeleteAll(Table* t){
-    int deletedCount = 0;
+uint32_t Database::DeleteAll(Table* t){
+    uint32_t deletedCount = 0;
     for(uint32_t i = 0;i<t->rowCount; i++){
         if(t->IsRowDeleted(i)) continue;
         t->MarkRowDeleted(i);
@@ -132,7 +132,7 @@ int Database::DeleteAll(Table* t){
     return deletedCount;
 }
 
-void Database::SelectWithRange(Table* t, const string& columnName, int L, int R, vector<Row*>& res){
+void Database::SelectWithRange(Table* t, const string& columnName, int32_t L, int32_t R, vector<Row*>& res){
 
     res.clear();
 
@@ -143,7 +143,7 @@ void Database::SelectWithRange(Table* t, const string& columnName, int L, int R,
             Row* r = new Row(t->schema);
             void* slot = t->RowSlot(i);
             t->DeserializeRow(slot, r);
-            int val = *(int*)r->value[columnName];
+            int32_t val = *(int32_t*)r->value[columnName];
             if(L<=val&&val<=R) res.push_back(r);
             else delete r;
         }
@@ -153,7 +153,7 @@ void Database::SelectWithRange(Table* t, const string& columnName, int L, int R,
     Pager* idxPager = t->indexPagers[columnName];
     uint32_t leafPageNum = BtreeFindLeaf(idxPager, 0, L, 0);
     
-    vector<int> selectedRowIds;
+    vector<uint32_t> selectedRowIds;
 
     bool firstPage = 1;
     
@@ -162,7 +162,7 @@ void Database::SelectWithRange(Table* t, const string& columnName, int L, int R,
         LeafNodeSelectRange(t, leaf, L, R, selectedRowIds);
 
         if(leaf->header.numCells > 0){
-            int lastKey = leaf->cells[leaf->header.numCells - 1].key;
+            int32_t lastKey = leaf->cells[leaf->header.numCells - 1].key;
             if(lastKey > R) break;
         }
         firstPage = 0;
@@ -171,7 +171,7 @@ void Database::SelectWithRange(Table* t, const string& columnName, int L, int R,
     
 
     sort(selectedRowIds.begin(), selectedRowIds.end());
-    for(int rowId : selectedRowIds){
+    for(uint32_t rowId : selectedRowIds){
         if(t->IsRowDeleted(rowId)) continue;
         Row* r = new Row(t->schema);
         void* src = t->RowSlot(rowId);
@@ -181,9 +181,9 @@ void Database::SelectWithRange(Table* t, const string& columnName, int L, int R,
 
 }
 
-int Database::DeleteWithRange(Table* t, const string& columnName, int L, int R){
+uint32_t Database::DeleteWithRange(Table* t, const string& columnName, int32_t L, int32_t R){
     if(t->indexPagers.count(columnName) == 0){
-        int deletedCount = 0;
+        uint32_t deletedCount = 0;
         for(uint32_t i = 0; i<t->rowCount; i++){
             if(t->IsRowDeleted(i)) continue;
             
@@ -191,7 +191,7 @@ int Database::DeleteWithRange(Table* t, const string& columnName, int L, int R){
             Row* r = new Row(t->schema);
             t->DeserializeRow(slot, r);
             
-            int val = *(int*)r->value[columnName];
+            int32_t val = *(int32_t*)r->value[columnName];
             if(L<=val&&val<=R){
                 t->MarkRowDeleted(i);
                 deletedCount++;
@@ -216,9 +216,9 @@ void Database::FlushToMeta() {
         for(Column* c : table->schema){
             if(c->type==INT){
                 bool hasIndex = table->indexPagers.count(c->columnName);
-                ofs << c->columnName << " " << (int)c->type << " " << hasIndex << " " << c->offset << endl;
+                ofs << c->columnName << " " << (uint8_t)c->type << " " << hasIndex << " " << c->offset << endl;
             }
-            else ofs << c->columnName << " " << (int)c->type << " " << c->size << " " << c->offset << endl;
+            else ofs << c->columnName << " " << (uint8_t)c->type << " " << c->size << " " << c->offset << endl;
         }
         ofs << table->freeList.size() << endl;
         while(!table->freeList.empty()){
@@ -234,19 +234,19 @@ void Database::LoadFromMeta(){
     ifstream ifs(metaFileName+".teto");
     if(!ifs.is_open()) return;
 
-    int numTables;
+    uint32_t numTables;
     if(!(ifs >> numTables)) return;
 
-    for(int i = 0; i < numTables; i++){
+    for(uint32_t i = 0; i < numTables; i++){
         string tName;
-        int rCount, colCount;
+        uint32_t rCount, colCount;
         ifs >> tName >> rCount >> colCount;
 
         Table* t = new Table(tName, metaFileName, rCount);
-        for(int j = 0; j < colCount; j++){
+        for(uint32_t j = 0; j < colCount; j++){
             string cName;
-            int cTypeInt;
-            size_t cSize, cOffset;
+            uint8_t cTypeInt;
+            uint32_t cSize, cOffset;
             ifs >> cName >> cTypeInt >> cSize >> cOffset;
             if(cTypeInt == INT){
                 bool hasIndex = cSize;
@@ -256,10 +256,10 @@ void Database::LoadFromMeta(){
             else t->AddColumn(new Column(cName, (Type)cTypeInt, cSize, cOffset));
         }
 
-        int freeListSize;
+        uint32_t freeListSize;
         if (ifs >> freeListSize) {
-            for(int k=0; k<freeListSize; k++) {
-                int id;
+            for(uint32_t k=0; k<freeListSize; k++) {
+                uint32_t id;
                 ifs >> id;
                 t->freeList.push(id);
             }

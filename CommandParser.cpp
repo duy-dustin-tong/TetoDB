@@ -30,7 +30,7 @@ ParsedCommand CommandParser::Parse(const string& line) {
         }
         
         string colName, colType;
-        int colSize;
+        uint16_t colSize;
         while (ss >> colName >> colType >> colSize) {
             cmd.args.push_back(colName);
             cmd.args.push_back(colType);
