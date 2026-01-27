@@ -23,7 +23,7 @@ int main(int argc, char* argv[]){
 
     if(argc>=3){
         string txtFileName = argv[2];
-        ifstream txtFile(txtFileName + ".txt");
+        ifstream txtFile(txtFileName);
         
 
         if(!txtFile.is_open()){

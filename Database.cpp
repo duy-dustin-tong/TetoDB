@@ -97,8 +97,7 @@ Result Database::Insert(const string& name, stringstream& ss){
             
             } 
             
-            // idxPager->Flush(0, PAGE_SIZE);
-            // if(res.didSplit) idxPager->Flush(res.rightChildPageNum, PAGE_SIZE);
+
         }
 
     }
@@ -138,16 +137,17 @@ void Database::SelectWithRange(Table* t, const string& columnName, int32_t L, in
     res.clear();
 
     if(t->indexPagers.count(columnName) == 0){
-        
+        Row* r = new Row(t->schema);
         for(uint32_t i = 0; i<t->rowCount; i++){
             if(t->IsRowDeleted(i)) continue;
-            Row* r = new Row(t->schema);
+            
             void* slot = t->RowSlot(i);
             t->DeserializeRow(slot, r);
             int32_t val = *(int32_t*)r->value[columnName];
             if(L<=val&&val<=R) res.push_back(r);
-            else delete r;
+            
         }
+        delete r;
         return;
     }
 
@@ -185,11 +185,12 @@ void Database::SelectWithRange(Table* t, const string& columnName, int32_t L, in
 uint32_t Database::DeleteWithRange(Table* t, const string& columnName, int32_t L, int32_t R){
     if(t->indexPagers.count(columnName) == 0){
         uint32_t deletedCount = 0;
+        Row* r = new Row(t->schema);
         for(uint32_t i = 0; i<t->rowCount; i++){
             if(t->IsRowDeleted(i)) continue;
             
             void* slot = t->RowSlot(i);
-            Row* r = new Row(t->schema);
+            
             t->DeserializeRow(slot, r);
             
             int32_t val = *(int32_t*)r->value[columnName];
@@ -197,9 +198,9 @@ uint32_t Database::DeleteWithRange(Table* t, const string& columnName, int32_t L
                 t->MarkRowDeleted(i);
                 deletedCount++;
             }
-            delete r;
+            
         }
-
+        delete r;
         return deletedCount;
     }
 
