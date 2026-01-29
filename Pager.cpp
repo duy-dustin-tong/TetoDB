@@ -14,6 +14,8 @@
     // Windows permissions
     #define S_IWUSR S_IWRITE
     #define S_IRUSR S_IREAD
+    #include <cstddef>
+    using ssize_t = ptrdiff_t;
 #else
     #include <unistd.h> // Linux/Mac standard
 #endif
