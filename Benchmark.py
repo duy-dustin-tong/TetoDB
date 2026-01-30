@@ -11,6 +11,13 @@ import argparse
 DEFAULT_ROWS = 50000
 DB_EXE = "./TetoDB" if os.name != 'nt' else "TetoDB.exe"
 DB_NAME_PREFIX = "bench_db"
+WAIT_TIME = 5 # Seconds to wait for I/O cooldown
+
+# Operation Counts (Higher = More Statistically Significant)
+NUM_POINT_SELECTS = 1000
+NUM_RANGE_SELECTS = 100
+NUM_POINT_DELETES = 1000
+NUM_RANGE_DELETES = 100
 
 def generate_random_string(length=16):
     letters = string.ascii_letters
@@ -23,62 +30,82 @@ def generate_dataset(num_rows):
     random.shuffle(ids)
     for uid in ids:
         data.append((uid, generate_random_string()))
-    return data
+    return data, ids
 
-def create_script(filename, table_name, use_index, dataset, target_id):
-    print(f"\nWriting script {filename}...")
+def generate_query_set(all_ids, num_rows):
+    """
+    Generates a fixed list of operations with SCALED range sizes.
+    Range Size = ~1% of Total Rows.
+    """
     
+    # Scale range size: 1% of DB size (min 10 rows)
+    range_size = max(10, int(num_rows * 0.01))
+    
+    print(f"Generating consistent query set (Range Size: {range_size} rows)...")
+    ops = []
+
+    # 1. Point Selects
+    for _ in range(NUM_POINT_SELECTS):
+        ops.append(("POINT_SEL", random.choice(all_ids)))
+
+    # 2. Range Selects
+    for _ in range(NUM_RANGE_SELECTS):
+        start = random.choice(all_ids)
+        ops.append(("RANGE_SEL", start, start + range_size))
+
+    # 3. Point Deletes
+    for _ in range(NUM_POINT_DELETES):
+        ops.append(("POINT_DEL", random.choice(all_ids)))
+
+    # 4. Range Deletes (Half the size of Selects to be safe)
+    for _ in range(NUM_RANGE_DELETES):
+        start = random.choice(all_ids)
+        ops.append(("RANGE_DEL", start, start + (range_size // 2)))
+        
+    return ops, range_size
+
+def create_load_script(filename, table_name, use_index, dataset):
+    print(f"Writing LOAD script {filename}...")
     with open(filename, "w") as f:
-        # 1. Create Table
         idx_flag = "1" if use_index else "0"
         f.write(f"create table {table_name} id int {idx_flag} val char 32\n")
         
         num_rows = len(dataset)
-        # Commit every 5% of rows
         commit_step = max(5000, num_rows // 20)
-        # Update progress bar every 5%
         progress_step = max(1, num_rows // 20)
 
-        # 2. Write Inserts
         for i, (uid, val) in enumerate(dataset):
             f.write(f"insert into {table_name} {uid} {val}\n")
-            
-            # Progress Bar (Generation)
             if (i + 1) % progress_step == 0:
                 percent = ((i + 1) / num_rows) * 100
-                sys.stdout.write(f"\r   [Generating: {int(percent)}%] {i+1}/{num_rows} cmds written")
+                sys.stdout.write(f"\r   [Generating Load: {int(percent)}%] {i+1}/{num_rows}")
                 sys.stdout.flush()
-
             if (i + 1) % commit_step == 0:
                 f.write(".commit\n")
         
-        print("") # Newline after progress bar
+        f.write("\n.commit\n")
+        f.write(".exit\n")
+    print("")
 
-        # 3. Final Commit
+def create_query_script(filename, table_name, query_set):
+    """Writes the query script using the pre-generated operation list."""
+    print(f"Writing QUERY script {filename}...")
+    with open(filename, "w") as f:
+        for op in query_set:
+            if op[0] == "POINT_SEL":
+                f.write(f"select from {table_name} where id {op[1]} {op[1]}\n")
+            elif op[0] == "RANGE_SEL":
+                f.write(f"select from {table_name} where id {op[1]} {op[2]}\n")
+            elif op[0] == "POINT_DEL":
+                f.write(f"delete from {table_name} where id {op[1]} {op[1]}\n")
+            elif op[0] == "RANGE_DEL":
+                f.write(f"delete from {table_name} where id {op[1]} {op[2]}\n")
+        
         f.write(".commit\n")
-        
-        # 4. TEST SELECT (Point Lookup)
-        f.write(f"select from {table_name} where id {target_id} {target_id}\n")
-        
-        # 5. TEST DELETE (Range Delete)
-        # We delete a range of 100 IDs to test range-deletion speed
-        del_start = 100
-        del_end = 200
-        f.write(f"delete from {table_name} where id {del_start} {del_end}\n")
-        
         f.write(".exit\n")
 
-def run_test(script_name, target_id, expected_val, total_rows):
-    # Cleanup old DB files
-    for ext in [".db", ".teto", ".btree"]:
-        try:
-            files = [f for f in os.listdir('.') if f.startswith(DB_NAME_PREFIX) and f.endswith(ext)]
-            for f in files: os.remove(f)
-        except: pass
-
-    print(f"\nRunning TetoDB with {script_name}...")
-    
-    start_time = time.time()
+def run_process(script_name, total_rows_for_progress=0, is_loading=False):
+    print(f"   -> Executing {script_name}...")
     
     process = subprocess.Popen(
         [DB_EXE, DB_NAME_PREFIX, script_name], 
@@ -88,91 +115,98 @@ def run_test(script_name, target_id, expected_val, total_rows):
         bufsize=1 
     )
 
-    # Metrics
-    insert_times = []
-    select_time = 0.0
-    delete_time = 0.0
+    metrics = {
+        "insert": [], "pt_sel": [], "rg_sel": [], "pt_del": [], "rg_del": []
+    }
     
-    # Verification
-    found_target_id = False
-    found_correct_val = False
-    actual_val_found = "None"
-    
-    # State Machine for Parsing Output
-    # We need to know WHICH command the timing belongs to.
-    # We look for the status message immediately preceding the timing.
-    last_command_type = "UNKNOWN" 
-    
-    # Progress Bar Variables
+    last_cmd = "UNKNOWN"
+    sel_count = 0
+    del_count = 0
     inserts_done = 0
-    update_interval = max(1, total_rows // 20) 
-    
-    print("--- EXECUTION PROGRESS ---")
+    update_interval = max(1, total_rows_for_progress // 20) if total_rows_for_progress > 0 else 1
+    start_time = time.time()
 
     for line in process.stdout:
-        # 1. Detect Command Types
         if "row inserted" in line:
-            last_command_type = "INSERT"
-            inserts_done += 1
-            # Live Progress Bar
-            if inserts_done % update_interval == 0:
-                elapsed = time.time() - start_time
-                percent = (inserts_done / total_rows) * 100
-                if elapsed > 0 and inserts_done > 0:
-                    rows_per_sec = inserts_done / elapsed
-                    eta = (total_rows - inserts_done) / rows_per_sec
-                    print(f"   [Running: {int(percent)}%] {inserts_done}/{total_rows} inserts | ETA: {eta:.1f}s")
+            last_cmd = "INSERT"
+            if is_loading:
+                inserts_done += 1
+                if inserts_done % update_interval == 0:
+                    elapsed = time.time() - start_time
+                    percent = (inserts_done / total_rows_for_progress) * 100
+                    if elapsed > 0:
+                        eta = (total_rows_for_progress - inserts_done) / (inserts_done / elapsed)
+                        print(f"      [Loading: {int(percent)}%] ETA: {eta:.1f}s")
 
         elif "rows in set" in line:
-            last_command_type = "SELECT"
-        
-        elif "Deleted" in line and "rows" in line:
-            last_command_type = "DELETE"
+            last_cmd = "SELECT"
+            sel_count += 1
+            
+        elif "Deleted" in line:
+            last_cmd = "DELETE"
+            del_count += 1
 
-        # 2. Verification Logic (Inspect Select Output)
-        elif line.startswith("|"):
-            if str(target_id) in line:
-                print(f"\n   RESULT: {line.strip()}")
-                found_target_id = True
-                clean_expected = expected_val.replace('"', '')
-                if clean_expected in line:
-                    found_correct_val = True
-                else:
-                    parts = line.split("|")
-                    if len(parts) > 2: actual_val_found = parts[2].strip()
-
-        # 3. Capture Timing
         match = re.search(r"\((\d+\.\d+) (ms|us)\)", line)
         if match:
             val = float(match.group(1))
             unit = match.group(2)
             if unit == "us": val /= 1000.0
             
-            # Assign timing to the correct bucket
-            if last_command_type == "INSERT":
-                insert_times.append(val)
-            elif last_command_type == "SELECT":
-                select_time = val
-            elif last_command_type == "DELETE":
-                delete_time = val
+            if last_cmd == "INSERT":
+                metrics["insert"].append(val)
+            elif last_cmd == "SELECT":
+                if sel_count <= NUM_POINT_SELECTS:
+                    metrics["pt_sel"].append(val)
+                else:
+                    metrics["rg_sel"].append(val)
+            elif last_cmd == "DELETE":
+                if del_count <= NUM_POINT_DELETES:
+                    metrics["pt_del"].append(val)
+                else:
+                    metrics["rg_del"].append(val)
             
-            # Reset state
-            last_command_type = "UNKNOWN"
-            
-    print("--------------------------")
+            last_cmd = "UNKNOWN"
+
     process.wait()
-    total_wall_time = time.time() - start_time
     
-    # Calculate Stats
-    avg_insert = sum(insert_times) / len(insert_times) if insert_times else 0
+    avgs = {}
+    for key, lst in metrics.items():
+        if lst: avgs[key] = sum(lst) / len(lst)
+        else: avgs[key] = 0.0
+            
+    return avgs
 
-    if found_correct_val: status = "PASSED"
-    elif found_target_id: status = f"FAILED (Expected {expected_val}, Got {actual_val_found})"
-    else: status = "FAILED (Target ID Not Found)"
+def run_test_suite(table_name, use_index, dataset, query_set, num_rows):
+    # Cleanup
+    for ext in [".db", ".teto", ".btree", ".tmp"]:
+        try:
+            files = [f for f in os.listdir('.') if f.startswith(DB_NAME_PREFIX) and f.endswith(ext)]
+            for f in files: os.remove(f)
+        except: pass
 
-    print(f"Status: {status}\n")
-        
-    return avg_insert, select_time, delete_time, status
+    suffix = "with_index" if use_index else "no_index"
+    load_file = f"bench_{suffix}_load.txt"
+    query_file = f"bench_{suffix}_query.txt"
+
+    create_load_script(load_file, table_name, use_index, dataset)
+    create_query_script(query_file, table_name, query_set)
+
+    print(f"\n[PHASE 1] Loading Data ({table_name})...")
+    m_load = run_process(load_file, num_rows, is_loading=True)
+    
+    print(f"\n[WAIT] Sleeping {WAIT_TIME}s for I/O cooldown...")
+    time.sleep(WAIT_TIME)
+
+    print(f"\n[PHASE 2] Running Queries ({table_name})...")
+    m_query = run_process(query_file, 0, is_loading=False)
+
+    return {
+        "insert": m_load["insert"],
+        "pt_sel": m_query["pt_sel"],
+        "rg_sel": m_query["rg_sel"],
+        "pt_del": m_query["pt_del"],
+        "rg_del": m_query["rg_del"]
+    }
 
 def main():
     if not os.path.exists(DB_EXE):
@@ -182,59 +216,50 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("rows", nargs="?", type=int, default=DEFAULT_ROWS)
     args = parser.parse_args()
-
     num_rows = args.rows
-    target_id = int(num_rows * 0.8) 
 
-    dataset = generate_dataset(num_rows)
-    
-    expected_val = "UNKNOWN"
-    for uid, val in dataset:
-        if uid == target_id:
-            expected_val = val
-            break
-            
+    dataset, all_ids = generate_dataset(num_rows)
+    # Pass num_rows to scale the query range size
+    query_set, range_sz = generate_query_set(all_ids, num_rows)
+
     print("=" * 60)
-    print(f"BENCHMARK: {num_rows} ROWS | TARGET ID: {target_id}")
+    print(f"BENCHMARK: {num_rows} ROWS")
+    print(f" - Range Size: {range_sz} Rows (1% of Total)")
+    print(f" - {NUM_POINT_SELECTS} Point Selects")
+    print(f" - {NUM_RANGE_SELECTS} Range Selects")
+    print(f" - {NUM_POINT_DELETES} Point Deletes")
+    print(f" - {NUM_RANGE_DELETES} Range Deletes")
     print("=" * 60)
 
-    create_script("bench_no_index.txt", "table_slow", False, dataset, target_id)
-    create_script("bench_with_index.txt", "table_fast", True, dataset, target_id)
-    
-    print("=" * 60)
-    
-    # Run Tests
+    print(f"\n[SETUP WAIT] Sleeping {WAIT_TIME}s to stabilize system...")
+    time.sleep(WAIT_TIME)
+
     print(">>> BENCHMARK 1: NO INDEX (Linear Scan)")
-    ins_no, sel_no, del_no, stat_no = run_test("bench_no_index.txt", target_id, expected_val, num_rows)
-
-    print(">>> BENCHMARK 2: WITH INDEX (B-Tree)")
-    ins_idx, sel_idx, del_idx, stat_idx = run_test("bench_with_index.txt", target_id, expected_val, num_rows)
+    res_no = run_test_suite("table_slow", False, dataset, query_set, num_rows)
     
-    print("=" * 80)
-    print(f"FINAL RESULTS ({num_rows} Rows)")
-    print("=" * 80)
-    
-    if stat_no != "PASSED" or stat_idx != "PASSED":
-        print("WARNING: ONE OR MORE TESTS FAILED CORRECTNESS CHECK!")
-        print("-" * 80)
+    print(f"\n[INTERMISSION] Sleeping {WAIT_TIME}s...")
+    time.sleep(WAIT_TIME)
 
-    # Helper for speedup strings
+    print("\n>>> BENCHMARK 2: WITH INDEX (B-Tree)")
+    res_idx = run_test_suite("table_fast", True, dataset, query_set, num_rows)
+    
+    print("\n" + "=" * 100)
+    print(f"STATISTICAL RESULTS ({num_rows} Rows)")
+    print("=" * 100)
+
     def get_speedup(slow, fast):
-        if fast == 0: return "Infinite"
+        if fast == 0: return "Inf"
         return f"{slow/fast:.1f}x"
 
-    print(f"{'Metric':<20} | {'No Index (Linear)':<20} | {'With Index (B-Tree)':<22} | {'Comparison'}")
-    print("-" * 90)
+    print(f"{'Metric (Average Time)':<30} | {'No Index':<15} | {'B-Tree':<15} | {'Speedup'}")
+    print("-" * 100)
     
-    # 1. INSERT Comparison
-    print(f"{'Avg Insert Time':<20} | {ins_no:.4f} ms{'':<11} | {ins_idx:.4f} ms{'':<13} | Index Overhead: {ins_idx - ins_no:.4f} ms")
-    
-    # 2. SELECT Comparison
-    print(f"{'SELECT Time':<20} | {sel_no:.4f} ms{'':<11} | {sel_idx:.4f} ms{'':<13} | Speedup: {get_speedup(sel_no, sel_idx)}")
-
-    # 3. DELETE Comparison
-    print(f"{'DELETE Time':<20} | {del_no:.4f} ms{'':<11} | {del_idx:.4f} ms{'':<13} | Speedup: {get_speedup(del_no, del_idx)}")
-    print("-" * 90)
+    print(f"{'Insert':<30} | {res_no['insert']:.4f} ms      | {res_idx['insert']:.4f} ms      | Overhead: {res_idx['insert'] - res_no['insert']:.4f} ms")
+    print(f"{'Point SELECT':<30} | {res_no['pt_sel']:.4f} ms      | {res_idx['pt_sel']:.4f} ms      | {get_speedup(res_no['pt_sel'], res_idx['pt_sel'])}")
+    print(f"{'Range SELECT (' + str(range_sz) + ' rows)':<30} | {res_no['rg_sel']:.4f} ms      | {res_idx['rg_sel']:.4f} ms      | {get_speedup(res_no['rg_sel'], res_idx['rg_sel'])}")
+    print(f"{'Point DELETE':<30} | {res_no['pt_del']:.4f} ms      | {res_idx['pt_del']:.4f} ms      | {get_speedup(res_no['pt_del'], res_idx['pt_del'])}")
+    print(f"{'Range DELETE':<30} | {res_no['rg_del']:.4f} ms      | {res_idx['rg_del']:.4f} ms      | {get_speedup(res_no['rg_del'], res_idx['rg_del'])}")
+    print("-" * 100)
 
 if __name__ == "__main__":
     main()

@@ -11,6 +11,28 @@
 
 Database* DB_INSTANCE = nullptr;
 
+void RunCommandWithTimer(const string& line) {
+    // 1. Start Timer
+    auto start = chrono::high_resolution_clock::now();
+    
+    // 2. Execute
+    ExecuteCommand(line);
+    
+    // 3. FORCE FLUSH (Crucial for benchmarking output speed)
+    cout << flush; 
+
+    // 4. Stop Timer
+    auto end = chrono::high_resolution_clock::now();
+    
+    // 5. Calculate Duration
+    chrono::duration<double, milli> elapsed = end - start;
+    
+    // 6. Print with HIGH PRECISION (6 decimals)
+    if(!line.empty()) {
+        cout << "(" << fixed << setprecision(6) << elapsed.count() << " ms)" << endl;
+    }
+}
+
 int main(int argc, char* argv[]){
     if(argc<2){
         cout << "Need filename" <<endl;
@@ -32,12 +54,7 @@ int main(int argc, char* argv[]){
         else{
             string line;
             while(getline(txtFile, line) && DB_INSTANCE->running){
-                auto start = chrono::high_resolution_clock::now();
-                ExecuteCommand(line);
-                auto end = chrono::high_resolution_clock::now();
-                
-                chrono::duration<double, milli> elapsed = end - start;
-                if(!line.empty()) cout << "(" << fixed << setprecision(2) << elapsed.count() << " ms)" << endl;
+                RunCommandWithTimer(line);
             }
             
         }
@@ -51,12 +68,8 @@ int main(int argc, char* argv[]){
         string line;
         getline(cin, line);
 
-        auto start = chrono::high_resolution_clock::now();
-        ExecuteCommand(line);
-        auto end = chrono::high_resolution_clock::now();
+        RunCommandWithTimer(line);
         
-        chrono::duration<double, milli> elapsed = end - start;
-        if(!line.empty()) cout << "(" << fixed << setprecision(2) << elapsed.count() << " ms)" << endl;
 
     }
 
