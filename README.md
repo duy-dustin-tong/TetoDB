@@ -18,9 +18,7 @@ Designed for portability and performance, TetoDB relies on fixed-width binary se
 * **Buffer Pool (Pager):** Manages file I/O with an in-memory cache, supporting lazy writes and manual commits.
 * **Cross-Platform:** Compiles and runs natively on both **Windows** (using `_commit`, `<io.h>`) and **Linux** (using `fsync`, `<unistd.h>`).
 * **Performance Profiling:** Built-in execution timer measures the processing time of every command in nanoseconds/milliseconds.
-* **10 Million Row Scale:** Capable of handling massive datasets with sub-millisecond query times using B-Tree indexing.
-
-
+* **10 Million Row Scale:** Capable of handling massive datasets with **sub-millisecond** query times (up to 1M rows) and **~2ms** query times at 10M rows.
 
 ## 📦 Installation & Build
 
@@ -128,11 +126,11 @@ TetoDB uses three types of binary files to store data:
 
 TetoDB is composed of several modular components:
 
-1.  **Pager (`Pager.cpp`):** Handles low-level file I/O. It reads/writes 4KB blocks and manages the "Flush" strategy to persist data to disk.
-2.  **B-Tree (`Btree.cpp`):** Implements a B+ Tree data structure for indexing. It supports splitting (for inserts) and merging (concepts for delete), ensuring the tree remains balanced.
-3.  **Schema (`Schema.cpp`):** Defines the structure of tables (`Table`, `Column`, `Row`) and handles serialization/deserialization of row data into raw bytes.
-4.  **Database Engine (`Database.cpp`):** Orchestrates the table metadata, manages the active tables, and executes high-level logic (e.g., deciding whether to use a full table scan or an index scan).
-5.  **Command Parser (`CommandParser.cpp`):** Tokenizes and validates user input into structured command objects.
+1. **Pager (`Pager.cpp`):** Handles low-level file I/O. It reads/writes 4KB blocks and manages the "Flush" strategy to persist data to disk.
+2. **B-Tree (`Btree.cpp`):** Implements a B+ Tree data structure for indexing. It supports splitting (for inserts) and merging (concepts for delete), ensuring the tree remains balanced.
+3. **Schema (`Schema.cpp`):** Defines the structure of tables (`Table`, `Column`, `Row`) and handles serialization/deserialization of row data into raw bytes.
+4. **Database Engine (`Database.cpp`):** Orchestrates the table metadata, manages the active tables, and executes high-level logic (e.g., deciding whether to use a full table scan or an index scan).
+5. **Command Parser (`CommandParser.cpp`):** Tokenizes and validates user input into structured command objects.
 
 ## 📊 Performance Benchmarks
 
@@ -145,30 +143,25 @@ TetoDB has been stress-tested with up to **10,000,000 rows**. Below are the resu
 
 | Metric | No Index (Linear Scan) | With Index (B-Tree) | Speedup |
 | --- | --- | --- | --- |
-| **SELECT Time** | `355.80 ms` | `0.19 ms` | **1,872x Faster** |
-| **DELETE Time** | `334.09 ms` | `0.03 ms` | **11,136x Faster** |
-| **Avg Insert** | `0.0004 ms` | `0.0017 ms` | *Slower (Overhead)* |
+| **SELECT Time** | `615.48 ms` | `2.16 ms` | **285x Faster** |
+| **DELETE Time** | `650.82 ms` | `1.03 ms` | **631x Faster** |
+| **Avg Insert** | `0.0030 ms` | `0.0065 ms` | *Slower (Overhead)* |
 
 ### 2. Time Growth Analysis (How it Scales)
 
 As the database grows, the performance difference becomes drastic.
 
-* **SELECT / DELETE ( vs ):**
-* **Linear Scan:** Time grows **linearly**. 1M rows takes ~33ms, so 10M rows takes ~330ms.
-* **B-Tree:** Time grows **logarithmically**. 1M rows takes 0.05ms, and 10M rows only grows to 0.19ms. It remains virtually instant regardless of size.
-
-
-* **INSERT ( vs ):**
-* **Linear Scan:** Consistently fast (~0.0004ms) because it simply appends data to the end of the file.
-* **B-Tree:** Slightly slower (~0.0017ms) because it must traverse the tree to find the correct leaf node and occasionally split pages to keep the tree balanced.
+* **SELECT / DELETE:**
+* **Linear Scan:** Time grows **linearly**. 1M rows takes ~40ms, so 10M rows takes ~615ms.
+* **B-Tree:** Time grows **logarithmically**. It remains **sub-millisecond** up to 1M rows and only reaches ~2ms at 10M rows.
 
 
 
 | Dataset Size | Linear Select Time | B-Tree Select Time |
 | --- | --- | --- |
-| **100,000** | 3.34 ms | 0.04 ms |
-| **1,000,000** | 33.67 ms | 0.05 ms |
-| **10,000,000** | 355.80 ms | 0.19 ms |
+| **100,000** | 4.0 ms | 0.01 ms |
+| **1,000,000** | 41.2 ms | 0.12 ms |
+| **10,000,000** | 615.5 ms | 2.16 ms |
 
 ## 🛠 Tools & Benchmarking
 
@@ -229,7 +222,7 @@ Walked 32 leaf pages.
 
 ## ⚠️ Limitations
 
-* **No Comments Supported:** The parser does not handle comments (e.g., `#` or `--`) in script files or iterative mode. Each command must be in one **single line**. Lines must contain only **ONE** valid commands or be empty.
+* **No Comments Supported:** The parser does not handle comments (e.g., `#` or `--`) in script files or interactive mode. Each command must be in one **single line**.
 * **Strict Syntax:** Syntax validation is minimal. Commands must strictly follow the format shown above (e.g., correct number of arguments, proper quoting). Malformed commands may cause undefined behavior or crashes.
 * **Fixed String Length:** Strings are strictly fixed-width (`char N`). If you insert a longer string, it is truncated.
 * **Integer Keys Only:** B-Tree indexing is currently supported only for `int` columns.

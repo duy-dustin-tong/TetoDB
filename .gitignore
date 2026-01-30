@@ -6,3 +6,5 @@
 !CMakeLists.txt
 /.vs
 /out
+*.tmp
+

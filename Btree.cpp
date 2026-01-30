@@ -10,14 +10,16 @@
 
 
 void CreateNewRoot(NodeHeader* root, Pager* pager, int32_t splitKey, uint32_t splitRowId, uint32_t rightChildPageNum){
-    uint32_t leftChildPageNum = pager->GetUnusedPageNum();
-    NodeHeader* leftChild = (NodeHeader*)pager->GetPage(leftChildPageNum);
+    pager->MarkDirty(0);
+
+    uint32_t leftChildPageNum = pager->numPages;
+    NodeHeader* leftChild = (NodeHeader*)pager->GetPage(leftChildPageNum, 1);
 
     memcpy(leftChild, root, INTERNAL_NODE_SIZE);
     leftChild->isRoot = 0;
     leftChild->parent = 0;
 
-    NodeHeader* rightChild = (NodeHeader*)pager->GetPage(rightChildPageNum);
+    NodeHeader* rightChild = (NodeHeader*)pager->GetPage(rightChildPageNum, 1);
     rightChild->parent = 0;
 
     InternalNode* internalRoot = (InternalNode*)root;
@@ -80,7 +82,7 @@ uint32_t InternalNodeFindChild(InternalNode* node, int32_t targetKey, uint32_t t
 }
 
 uint32_t BtreeFindLeaf(Pager* pager, uint32_t pageNum, int32_t key, uint32_t rowId){
-    void* node = pager->GetPage(pageNum);
+    void* node = pager->GetPage(pageNum, 0);
     NodeHeader* header = (NodeHeader*) node;
 
     if(header->type==LEAF) return pageNum;
@@ -92,11 +94,11 @@ uint32_t BtreeFindLeaf(Pager* pager, uint32_t pageNum, int32_t key, uint32_t row
 }
 
 void UpdateChildParents(Pager* pager, InternalNode* parentNode, uint32_t parentPageNum){
-    void* child = pager->GetPage(parentNode->rightChild);
+    void* child = pager->GetPage(parentNode->rightChild, 1);
     ((NodeHeader*)child)->parent = parentPageNum;
 
     for(uint16_t i = 0; i<parentNode->header.numCells;i++){
-        void* child = pager->GetPage(parentNode->cells[i].childPage);
+        void* child = pager->GetPage(parentNode->cells[i].childPage, 1);
         ((NodeHeader*)child)->parent = parentPageNum;
     }
 }
@@ -105,7 +107,7 @@ void InsertIntoParent(Pager* pager, NodeHeader* leftChild, int32_t key, uint32_t
     uint32_t parentPageNum = leftChild->parent;
 
     if(parentPageNum == 0){
-        InternalNode* root = (InternalNode*)pager->GetPage(0);
+        InternalNode* root = (InternalNode*)pager->GetPage(0,1);
 
         InsertResult res = InternalNodeInsert(root, pager, key, rowId, rightChildPageNum);
         if(!res.didSplit) return;
@@ -116,7 +118,7 @@ void InsertIntoParent(Pager* pager, NodeHeader* leftChild, int32_t key, uint32_t
         return;
     }
 
-    InternalNode* parent = (InternalNode*)pager->GetPage(parentPageNum);
+    InternalNode* parent = (InternalNode*)pager->GetPage(parentPageNum, 1);
     InsertResult res = InternalNodeInsert(parent, pager, key, rowId, rightChildPageNum);
 
     if(res.didSplit){
@@ -150,9 +152,9 @@ InsertResult LeafNodeInsert(Table* t, LeafNode* node, Pager* pager, int32_t key,
     if(LeafNodeInsertNonFull(t, node, key, rowId)) return {true, false, 0, 0, 0};
 
 
-    uint32_t newPageNum = pager->GetUnusedPageNum();
+    uint32_t newPageNum = pager->numPages;
     
-    LeafNode* rightNode = (LeafNode*) pager->GetPage(newPageNum);
+    LeafNode* rightNode = (LeafNode*) pager->GetPage(newPageNum, 1);
     InitializeLeafNode(rightNode);
     rightNode->header.isRoot = 0;
     rightNode->header.parent = node->header.parent;
@@ -212,8 +214,8 @@ InsertResult InternalNodeInsert(InternalNode* node, Pager* pager, int32_t key, u
         return {true, false, 0, 0, 0};
     }
 
-    uint32_t newPageNum = pager->GetUnusedPageNum();
-    InternalNode* rightNode = (InternalNode*)pager->GetPage(newPageNum);
+    uint32_t newPageNum = pager->numPages;
+    InternalNode* rightNode = (InternalNode*)pager->GetPage(newPageNum, 1);
 
     rightNode->header.type = INTERNAL;
     rightNode->header.isRoot = 0;
@@ -296,7 +298,7 @@ uint32_t BtreeDelete(Table* t, Pager* pager, int32_t L, int32_t R){
     bool firstPage = 1;
     
     while(leafPageNum != 0 || (firstPage && leafPageNum == 0)){
-        LeafNode* leaf = (LeafNode*)pager->GetPage(leafPageNum);
+        LeafNode* leaf = (LeafNode*)pager->GetPage(leafPageNum, 1); // mat change to not mark dirty later
         deletedCount += LeafNodeDeleteRange(t, leaf, L, R);
 
         if(leaf->header.numCells > 0){

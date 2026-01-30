@@ -44,7 +44,7 @@ public:
     void SerializeRow(Row* src, void* dest);
     void DeserializeRow(void* src, Row* dest);
     void AddColumn(Column* c);
-    void* RowSlot(uint32_t rowId);
+    void* RowSlot(uint32_t rowId, bool markDirty);
 
     bool IsRowDeleted(uint32_t rowId);
     void MarkRowDeleted(uint32_t rowId);
