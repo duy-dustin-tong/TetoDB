@@ -97,10 +97,10 @@ void Table::AddColumn(Column* c){
     rowsPerPage = PAGE_SIZE / rowSize; 
 }
 
-void* Table::RowSlot(uint32_t rowId){
+void* Table::RowSlot(uint32_t rowId, bool markDirty){
     uint32_t pageNum = rowId / rowsPerPage;
 
-    void* page = pager->GetPage(pageNum);
+    void* page = pager->GetPage(pageNum, markDirty);
 
     if(page == nullptr) return nullptr;
 
@@ -116,7 +116,7 @@ void Table::CreateIndex(const string& columnName){
     indexPagers[columnName] = p;
 
     if(p->numPages == 0){
-        LeafNode* rootNode = (LeafNode*)p->GetPage(0);
+        LeafNode* rootNode = (LeafNode*)p->GetPage(0, 1);
         InitializeLeafNode(rootNode);
         rootNode->header.isRoot = 1;
         //p->Flush(0, PAGE_SIZE);
@@ -125,14 +125,14 @@ void Table::CreateIndex(const string& columnName){
 }
 
 bool Table::IsRowDeleted(uint32_t rowId){
-    void* slot = RowSlot(rowId);
+    void* slot = RowSlot(rowId, 0);
     if (!slot) return true;
     uint8_t flag = *(uint8_t*)slot;
     return (flag == 1);
 }
 
 void Table::MarkRowDeleted(uint32_t rowId){
-    void* slot = RowSlot(rowId);
+    void* slot = RowSlot(rowId, 1);
     if (!slot) return;
 
     uint8_t flag = 1; // 1 = Dead

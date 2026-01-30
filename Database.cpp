@@ -29,8 +29,9 @@ Result Database::CreateTable(const string& tableName, stringstream& ss){
     }
     string dbFileName = metaFileName+"_"+tableName + ".db";
     remove(dbFileName.c_str());
-
+    
     Table* t = new Table(tableName, metaFileName);
+    
     tables[tableName] = t;
 
     string name, type;
@@ -85,7 +86,7 @@ Result Database::Insert(const string& name, stringstream& ss){
             Pager* idxPager = t->indexPagers[c->columnName];
             int32_t value = *(int32_t*)r->value[c->columnName];
             uint32_t leafPageNum = BtreeFindLeaf(idxPager, 0, value, newRowId);
-            LeafNode* leaf = (LeafNode*)idxPager->GetPage(leafPageNum);
+            LeafNode* leaf = (LeafNode*)idxPager->GetPage(leafPageNum, 1);
 
             
             InsertResult res = LeafNodeInsert(t, leaf, idxPager, value, newRowId);
@@ -102,7 +103,7 @@ Result Database::Insert(const string& name, stringstream& ss){
 
     }
 
-    t->SerializeRow(r, t->RowSlot(newRowId));
+    t->SerializeRow(r, t->RowSlot(newRowId, 1));
 
     delete r;
 
@@ -116,7 +117,7 @@ void Database::SelectAll(Table* t, vector<Row*>& res){
     for(uint32_t i = 0;i<t->rowCount; i++){
         if(t->IsRowDeleted(i)) continue;
         Row* r = new Row(t->schema);
-        void* slot = t->RowSlot(i);
+        void* slot = t->RowSlot(i, 0);
         t->DeserializeRow(slot, r);
         res.push_back(r);
     }
@@ -141,7 +142,7 @@ void Database::SelectWithRange(Table* t, const string& columnName, int32_t L, in
         for(uint32_t i = 0; i<t->rowCount; i++){
             if(t->IsRowDeleted(i)) continue;
             
-            void* slot = t->RowSlot(i);
+            void* slot = t->RowSlot(i, 0);
             t->DeserializeRow(slot, r);
             int32_t val = *(int32_t*)r->value[columnName];
             if(L<=val&&val<=R){
@@ -163,7 +164,7 @@ void Database::SelectWithRange(Table* t, const string& columnName, int32_t L, in
     bool firstPage = 1;
     
     while(leafPageNum != 0 || (firstPage && leafPageNum == 0)){
-        LeafNode* leaf = (LeafNode*)idxPager->GetPage(leafPageNum);
+        LeafNode* leaf = (LeafNode*)idxPager->GetPage(leafPageNum, 1); // may change to not mark dirty later
         LeafNodeSelectRange(t, leaf, L, R, selectedRowIds);
 
         if(leaf->header.numCells > 0){
@@ -179,7 +180,7 @@ void Database::SelectWithRange(Table* t, const string& columnName, int32_t L, in
     for(uint32_t rowId : selectedRowIds){
         if(t->IsRowDeleted(rowId)) continue;
         Row* r = new Row(t->schema);
-        void* src = t->RowSlot(rowId);
+        void* src = t->RowSlot(rowId, 0);
         t->DeserializeRow(src, r);
         res.push_back(r);
     }
@@ -193,7 +194,7 @@ uint32_t Database::DeleteWithRange(Table* t, const string& columnName, int32_t L
         for(uint32_t i = 0; i<t->rowCount; i++){
             if(t->IsRowDeleted(i)) continue;
             
-            void* slot = t->RowSlot(i);
+            void* slot = t->RowSlot(i, 0);
             
             t->DeserializeRow(slot, r);
             

@@ -9,19 +9,20 @@
 #include <sys/stat.h> // fstat
 
 #ifdef _WIN32
-    #include <io.h>  // Windows equivalent of unistd.h
-    #define F_OK 0
-    // Windows permissions
+    #include <io.h>
     #define S_IWUSR S_IWRITE
     #define S_IRUSR S_IREAD
+    #define open _open
+    #define close _close
+    #define read _read
+    #define write _write
+    #define lseek _lseek
+    #define chsize _chsize // For truncating
     #include <cstddef>
     using ssize_t = ptrdiff_t;
 #else
-    #include <unistd.h> // Linux/Mac standard
-#endif
-
-#ifndef O_BINARY
-#define O_BINARY 0
+    #include <unistd.h>
+    #define O_BINARY 0
 #endif
 
 
@@ -29,11 +30,20 @@
 
 using namespace std;
 
-Pager::Pager(const std::string& filename){
-    fileDescriptor = open(filename.c_str(), O_RDWR | O_CREAT | O_BINARY, S_IWUSR | S_IRUSR);
+Pager::Pager(const string& fileName, uint32_t maxPages)
+    : MAX_PAGES(maxPages), fileName(fileName), clockHand(0)
+{
+    fileDescriptor = open(fileName.c_str(), O_RDWR | O_CREAT | O_BINARY, S_IWUSR | S_IRUSR);
 
     if(fileDescriptor == -1){
-        std::cerr << "Error: Unable to open file " << filename << std::endl;
+        std::cerr << "Error: Unable to open file " << fileName << std::endl;
+        exit(1);
+    }
+
+    string tempName = fileName + ".tmp";
+    tempFileDescriptor = open(tempName.c_str(), O_RDWR | O_CREAT | O_TRUNC | O_BINARY, S_IWUSR | S_IRUSR);
+    if(tempFileDescriptor == -1){
+        cerr << "Error: Unable to open temp file " << tempName << endl;
         exit(1);
     }
 
@@ -44,9 +54,13 @@ Pager::Pager(const std::string& filename){
     else{
         fileLength = 0;
     }
+    
 
-
-    pages.clear();
+    buffers.resize(MAX_PAGES);
+    for(int i=0; i<MAX_PAGES; i++){
+        buffers[i].data = malloc(PAGE_SIZE);
+        buffers[i].flags = 0;
+    }
 
     if(fileLength % PAGE_SIZE != 0){
         cerr << "DB file is not a whole number of pages" << endl;
@@ -54,74 +68,145 @@ Pager::Pager(const std::string& filename){
     }
 
     numPages = fileLength/PAGE_SIZE;
-    pages.resize(numPages, nullptr);
 }
 
 Pager::~Pager(){
-    for(uint32_t i = 0;i<numPages; i++) free(pages[i]);
+    for(PageBuffer &p : buffers) free(p.data);
     close(fileDescriptor);
+    close(tempFileDescriptor);
+    string tempName = fileName+".tmp";
+    if(remove(tempName.c_str()) != 0){
+        cerr << "Warning: Could not delete temp file " << tempName << endl;
+    }
 }
 
-void* Pager::GetPage(uint32_t pageNum){
-    if(pageNum > numPages){
-        std::cerr << "Error: Tried to fetch page number out of bounds." << std::endl;
-        return nullptr;
-    }
 
-    if(pageNum == numPages) numPages++, pages.push_back(nullptr);
+void Pager::WritePage(uint32_t fd, uint32_t pageNum, void* data){
+    off_t offset = (off_t)pageNum * PAGE_SIZE;
+    lseek(fd, offset, SEEK_SET);
+    write(fd, data, PAGE_SIZE);
+}
 
-    if(pages[pageNum] != nullptr){
-        return pages[pageNum];
-    }
+void Pager::ReadPage(uint32_t fd, uint32_t pageNum, void* dest){
+    off_t offset = (off_t)pageNum * PAGE_SIZE;
+    lseek(fd, offset, SEEK_SET);
+    read(fd, dest, PAGE_SIZE);
+}
 
-    void* page = malloc(PAGE_SIZE);
-    uint32_t numPagesStored = fileLength / PAGE_SIZE;
+uint16_t Pager::EvictClock() {
 
-    if(pageNum <= numPagesStored){
-        lseek(fileDescriptor, pageNum * PAGE_SIZE, SEEK_SET);
-        ssize_t bytesRead = read(fileDescriptor, page, PAGE_SIZE);
-        
-        if(bytesRead == -1){
-            cerr << "Error reading file: " << errno << std::endl;
-            exit(1);
+    if(pageTable.size() < MAX_PAGES){
+        for(uint16_t i=0; i<MAX_PAGES; i++){
+            if(!(buffers[i].flags & VALID)) return i;
         }
     }
 
-    pages[pageNum] = page;
-    return pages[pageNum];
+    while(true){
+        PageBuffer& b = buffers[clockHand];
+
+        if(b.flags & RECENT){
+            //if is recent, gives second chance
+            b.flags ^= RECENT;
+            if(++clockHand == MAX_PAGES) clockHand = 0; // advance clock
+        } 
+        else{
+            pageTable.erase(b.pageNum);
+            
+            if(b.flags & DIRTY){
+                WritePage(tempFileDescriptor, b.pageNum, b.data);
+                pagesInTemp.insert(b.pageNum);
+            }
+            
+            uint16_t id = clockHand;
+            if(++clockHand == MAX_PAGES) clockHand = 0;
+
+            return id;
+        }
+    }
 }
 
-void Pager::Flush(uint32_t pageNum, uint32_t size){
-    if(pages[pageNum] == nullptr) return;
-
-    off_t offset = lseek(fileDescriptor, pageNum * PAGE_SIZE, SEEK_SET);
-    if(offset == -1){
-        cerr << "Error seeking file." << std::endl;
-        return;
+void Pager::MarkDirty(uint32_t pageNum){
+    if(pageTable.find(pageNum)!=pageTable.end()){
+        uint16_t bufferId = pageTable[pageNum];
+        buffers[bufferId].flags |= DIRTY;
     }
 
-    ssize_t bytesWritten = write(fileDescriptor, pages[pageNum], size);
-    if(bytesWritten == -1){
-        cerr << "Error writing to file." << std::endl;
-        return;
-    }
-
-    fileLength = max(fileLength, (uint32_t)(pageNum + 1) * PAGE_SIZE);
-    #ifdef _WIN32
-        _commit(fileDescriptor); // Windows commit
-    #else
-        fsync(fileDescriptor);   // Linux commit
-    #endif
 }
+
+void* Pager::GetPage(uint32_t pageNum, bool markDirty){
+    if(pageNum > numPages){
+        cerr << "Error: Tried to fetch page number out of bounds." << endl;
+        return nullptr;
+    }
+
+    if(pageTable.find(pageNum) != pageTable.end()){
+        uint16_t bufferId = pageTable[pageNum];
+        PageBuffer &b = buffers[bufferId];
+        b.flags |= RECENT; 
+        if(markDirty) b.flags |= DIRTY;
+        return b.data;
+    }
+
+    uint16_t victimId = EvictClock();
+
+    PageBuffer &b = buffers[victimId];
+
+    void* dest = b.data;
+    
+    b.pageNum = pageNum;
+    b.flags = VALID | RECENT;
+    if(markDirty) b.flags |= DIRTY;
+    
+    pageTable[pageNum] = victimId;
+
+    if(pagesInTemp.find(pageNum) != pagesInTemp.end()){
+        ReadPage(tempFileDescriptor, pageNum, dest);
+        b.flags |= DIRTY;
+    }
+    else if(pageNum < numPages){
+        ReadPage(fileDescriptor, pageNum, dest);
+    } 
+    else{
+        memset(dest, 0, PAGE_SIZE);
+        numPages = max(numPages, pageNum + 1);
+        b.flags |= DIRTY;
+    }
+
+
+    return dest;
+}
+
 
 void Pager::FlushAll(){
-    for(uint32_t i = 0; i < numPages; i++){
-        if(pages[i]) Flush(i, PAGE_SIZE);
+    void* copyBuf = malloc(PAGE_SIZE);
+
+    for(uint32_t pageNum : pagesInTemp){
+        if(pageTable.find(pageNum) == pageTable.end()){
+            ReadPage(tempFileDescriptor, pageNum, copyBuf);
+            WritePage(fileDescriptor, pageNum, copyBuf);
+        }
     }
+    free(copyBuf);
+
+    for(PageBuffer& b : buffers) if((b.flags & VALID) && (b.flags & DIRTY)){
+        WritePage(fileDescriptor, b.pageNum, b.data);
+        b.flags &= ~DIRTY;
+    }
+
+    #ifdef _WIN32
+        _commit(fileDescriptor);
+    #else
+        fsync(fileDescriptor);
+    #endif
+
+    #ifdef _WIN32
+        _chsize(tempFileDescriptor, 0); 
+    #else
+        ftruncate(tempFileDescriptor, 0);
+    #endif
+    
+    pagesInTemp.clear();
 }
 
-uint32_t Pager::GetUnusedPageNum(){
-    pages.push_back(nullptr);
-    return numPages++;
-}
+
 

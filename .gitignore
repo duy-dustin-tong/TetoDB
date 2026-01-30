@@ -3,4 +3,5 @@
 *.teto
 *.btree
 *.txt
+*.tmp
 !CMakeLists.txt
