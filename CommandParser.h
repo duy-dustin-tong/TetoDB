@@ -5,17 +5,15 @@
 #include <string>
 #include <vector>
 
-using namespace std;
-
 struct ParsedCommand {
-    string type; // CREATE, INSERT, SELECT, DROP, DELETE
-    string tableName;
-    vector<string> args;
+    std::string type; // CREATE, INSERT, SELECT, DROP, DELETE
+    std::string tableName;
+    std::vector<std::string> args;
     bool isValid;
-    string errorMessage;
+    std::string errorMessage;
 };
 
 class CommandParser {
 public:
-    static ParsedCommand Parse(const string& line);
+    static ParsedCommand Parse(const std::string& line);
 };

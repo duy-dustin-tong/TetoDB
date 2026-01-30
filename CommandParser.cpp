@@ -17,13 +17,13 @@ ParsedCommand CommandParser::Parse(const string& line) {
     if (!(ss >> token)) return cmd; // Empty line
     
     // Normalize to upper case for checking, but keep original for values
-    string upperToken = token;
-    transform(upperToken.begin(), upperToken.end(), upperToken.begin(), ::toupper);
+    std::string upperToken = token;
+    std::transform(upperToken.begin(), upperToken.end(), upperToken.begin(), ::toupper);
 
     if (upperToken == "CREATE") {
-        string keyword;
+        std::string keyword;
         ss >> keyword; 
-        if (keyword != "table") {
+        if (keyword != "TABLE") {
             cmd.errorMessage = "Syntax Error: Expected 'TABLE' after CREATE";
             return cmd;
         }
@@ -32,7 +32,7 @@ ParsedCommand CommandParser::Parse(const string& line) {
             return cmd;
         }
         
-        string colName, colType;
+        std::string colName, colType;
         uint16_t colSize;
         while (ss >> colName >> colType >> colSize) {
             cmd.args.push_back(colName);
@@ -43,9 +43,9 @@ ParsedCommand CommandParser::Parse(const string& line) {
         cmd.isValid = true;
     } 
     else if (upperToken == "INSERT") {
-        string keyword;
+        std::string keyword;
         ss >> keyword; 
-        if (keyword != "into") {
+        if (keyword != "INTO") {
              cmd.errorMessage = "Syntax Error: Expected 'INTO' after INSERT";
              return cmd;
         }
@@ -55,7 +55,7 @@ ParsedCommand CommandParser::Parse(const string& line) {
         }
 
         // Capture the rest of the line as args
-        string val;
+        std::string val;
         while (ss >> quoted(val)) { // Use quoted to handle "strings with spaces" if needed
              cmd.args.push_back(val);
         }
@@ -64,9 +64,9 @@ ParsedCommand CommandParser::Parse(const string& line) {
         cmd.isValid = true;
     }
     else if (upperToken == "SELECT") {
-        string keyword;
+        std::string keyword;
         ss >> keyword; 
-        if (keyword != "from") {
+        if (keyword != "FROM") {
              cmd.errorMessage = "Syntax Error: Expected 'FROM' after SELECT";
              return cmd;
         }
@@ -78,10 +78,10 @@ ParsedCommand CommandParser::Parse(const string& line) {
         cmd.type = "SELECT";
         cmd.isValid = true;
 
-        string whereKw;
+        std::string whereKw;
         if (ss >> whereKw) {
-            if (whereKw == "where") {
-                string col, l, r;
+            if (whereKw == "WHERE") {
+                std::string col, l, r;
                 if (ss >> col >> l >> r) {
                     cmd.args.push_back(col);
                     cmd.args.push_back(l);
@@ -94,9 +94,9 @@ ParsedCommand CommandParser::Parse(const string& line) {
         }
     }
     else if (upperToken == "DELETE") {
-        string keyword;
+        std::string keyword;
         ss >> keyword; 
-        if (keyword != "from") {
+        if (keyword != "FROM") {
              cmd.errorMessage = "Syntax Error: Expected 'FROM' after DELETE";
              return cmd;
         }
@@ -108,9 +108,9 @@ ParsedCommand CommandParser::Parse(const string& line) {
         cmd.type = "DELETE";
         cmd.isValid = true;
 
-        string whereKw;
+        std::string whereKw;
         if (ss >> whereKw) {
-            if (whereKw == "where") {
+            if (whereKw == "WHERE") {
                 string col, l, r;
                 if (ss >> col >> l >> r) {
                     cmd.args.push_back(col);

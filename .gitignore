@@ -3,5 +3,8 @@
 *.teto
 *.btree
 *.txt
-*.tmp
 !CMakeLists.txt
+/.vs
+/out
+*.tmp
+

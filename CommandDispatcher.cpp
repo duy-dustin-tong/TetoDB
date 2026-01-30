@@ -9,8 +9,6 @@
 #include <iomanip> // setw
 #include <sstream> // stringstream
 
-extern Database* DB_INSTANCE;
-
 void PrintTable(const vector<Row*>& rows, Table* t) {
     if (rows.empty()) {
         cout << "Empty set." << endl;
@@ -66,11 +64,11 @@ void ProcessDotCommand(const string &line){
     ss >> cmd;
 
     if(cmd == ".exit"){
-        DB_INSTANCE->running = false;
+        Database::GetInstance().running = false;
         return;
     }
     if(cmd == ".commit") {
-        DB_INSTANCE->Commit();
+        Database::GetInstance().Commit();
         cout << "Changes committed to disk." << endl;
         return;
     }
@@ -79,7 +77,7 @@ void ProcessDotCommand(const string &line){
         return;
     }
     if(cmd == ".tables"){
-        if (DB_INSTANCE->tables.empty()) {
+        if (Database::GetInstance().tables.empty()) {
             cout << "No tables found." << endl;
             return;
         }
@@ -97,7 +95,7 @@ void ProcessDotCommand(const string &line){
         cout << border << endl;
 
         // Rows
-        for(auto &[name, table] : DB_INSTANCE->tables) {
+        for(auto &[name, table] : Database::GetInstance().tables) {
             cout << "| " << left << setw(20) << name 
                 << "| " << left << setw(8) << table->rowCount 
                 << "| " << left << setw(6) << table->schema.size() << " |" << endl;
@@ -106,12 +104,12 @@ void ProcessDotCommand(const string &line){
         // Footer
         cout << border << endl;
         
-        cout << DB_INSTANCE->tables.size() << " tables found." << endl;
+        cout << Database::GetInstance().tables.size() << " tables found." << endl;
         return;
     }
     if(cmd == ".schema"){
         ss >> tableName;
-        Table* t = DB_INSTANCE->GetTable(tableName);
+        Table* t = Database::GetInstance().GetTable(tableName);
 
         if(t == nullptr){
             cout << "Error: Table '" << tableName << "' does not exist." << endl;
@@ -164,13 +162,13 @@ void ExecuteCommand(const string &line){
         stringstream ss; 
         for(auto& s : cmd.args) ss << s << " ";
         
-        Result res = DB_INSTANCE->CreateTable(cmd.tableName, ss);
+        Result res = Database::GetInstance().CreateTable(cmd.tableName, ss);
         if (res == Result::OK) cout << "Query OK: Table '" << cmd.tableName << "' created." << endl;
         else cout << "Error: Could not create table." << endl;
     }
     else if (cmd.type == "INSERT") {
         // FIX: Fetch table FIRST to check column types
-        Table* t = DB_INSTANCE->GetTable(cmd.tableName);
+        Table* t = Database::GetInstance().GetTable(cmd.tableName);
         if(!t) { 
             cout << "Error: Table '" << cmd.tableName << "' not found." << endl; 
             return; 
@@ -189,41 +187,41 @@ void ExecuteCommand(const string &line){
              }
         }
         
-        Result res = DB_INSTANCE->Insert(cmd.tableName, ss);
+        Result res = Database::GetInstance().Insert(cmd.tableName, ss);
         if (res == Result::OK) cout << "Query OK: 1 row inserted." << endl;
         else if (res == Result::INVALID_SCHEMA) cout << "Error: Data type mismatch." << endl;
         else cout << "Error: Insert failed." << endl;
     }
     else if (cmd.type == "SELECT") {
-        Table* t = DB_INSTANCE->GetTable(cmd.tableName);
+        Table* t = Database::GetInstance().GetTable(cmd.tableName);
         if (!t) { cout << "Error: Table '" << cmd.tableName << "' not found." << endl; return; }
 
         vector<Row*> rows;
         if (cmd.args.empty()) {
-            DB_INSTANCE->SelectAll(t, rows);
+            Database::GetInstance().SelectAll(t, rows);
         } else {
             // Args are [col, min, max]
             string col = cmd.args[0];
             int32_t l = stoi(cmd.args[1]);
             int32_t r = stoi(cmd.args[2]);
-            DB_INSTANCE->SelectWithRange(t, col, l, r, rows);
+            Database::GetInstance().SelectWithRange(t, col, l, r, rows);
         }
         
         PrintTable(rows, t);
     }
     else if (cmd.type == "DELETE") {
-        Table* t = DB_INSTANCE->GetTable(cmd.tableName);
+        Table* t = Database::GetInstance().GetTable(cmd.tableName);
         if (!t) { cout << "Error: Table '" << cmd.tableName << "' not found." << endl; return; }
 
         uint32_t deletedCount = 0;
         if (cmd.args.empty()) {
-            deletedCount = DB_INSTANCE->DeleteAll(t);
+            deletedCount = Database::GetInstance().DeleteAll(t);
         } else {
             // Args are [col, min, max]
             string col = cmd.args[0];
             int32_t l = stoi(cmd.args[1]);
             int32_t r = stoi(cmd.args[2]);
-            deletedCount = DB_INSTANCE->DeleteWithRange(t, col, l, r);
+            deletedCount = Database::GetInstance().DeleteWithRange(t, col, l, r);
         }
 
         cout<<"Deleted " << deletedCount << " rows."<<endl;

@@ -9,6 +9,24 @@
 #include <iostream>
 #include <algorithm> // for sort
 
+std::unique_ptr<Database> Database::instance = nullptr;
+
+Database& Database::GetInstance()
+{
+    if (!instance)
+    {
+        throw std::runtime_error("Database must be initialized with a name first!");
+    }
+    return *instance;
+}
+
+void Database::InitInstance(const std::string& name)
+{
+    if (!instance)
+    {
+        instance = std::unique_ptr<Database>(new Database(name));
+    }
+}
 
 Database::Database(const string& name)
     : metaFileName(name), running(true) 

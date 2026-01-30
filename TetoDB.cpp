@@ -9,7 +9,7 @@
 #include "CommandDispatcher.h"
 
 
-Database* DB_INSTANCE = nullptr;
+
 
 void RunCommandWithTimer(const string& line) {
     // 1. Start Timer
@@ -38,10 +38,10 @@ int main(int argc, char* argv[]){
         cout << "Need filename" <<endl;
         return -1;
     }
-
+    
     string dbName = argv[1];
-
-    DB_INSTANCE = new Database(dbName);
+    Database::InitInstance(dbName);
+    auto& dbInstance = Database::GetInstance();
 
     if(argc>=3){
         string txtFileName = argv[2];
@@ -53,16 +53,17 @@ int main(int argc, char* argv[]){
         }
         else{
             string line;
-            while(getline(txtFile, line) && DB_INSTANCE->running){
+            
+            while(getline(txtFile, line) && dbInstance.running){
                 RunCommandWithTimer(line);
             }
             
         }
         txtFile.close();
-        DB_INSTANCE->running = 0;
+        dbInstance.running = 0;
     }
 
-    while(DB_INSTANCE->running){
+    while(dbInstance.running){
         cout << "TETO_DB >> ";
 
         string line;
@@ -74,7 +75,6 @@ int main(int argc, char* argv[]){
     }
 
     cout << "Exiting..." << endl;
-    delete DB_INSTANCE;
 
     return 0;
 }

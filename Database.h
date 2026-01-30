@@ -14,7 +14,9 @@ class Row;
 
 class Database{
 public:
-    Database(const string& name);
+    static Database& GetInstance();
+    static void InitInstance(const std::string& name);
+    
     ~Database();
 
     Result CreateTable(const string& tableName, stringstream & ss);
@@ -33,4 +35,8 @@ public:
     map<string, Table*> tables;
     const string metaFileName;
     bool running;
+
+private:
+    Database(const string& name);
+    static std::unique_ptr<Database> instance;
 };
