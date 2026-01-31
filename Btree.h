@@ -19,77 +19,77 @@ struct NodeHeader{
     int32_t parent;
 };
 
-template<typename KeyType>
+template<typename T>
 struct LeafCell{
-    KeyType key;
+    T key;
     uint32_t rowId;
 };
 
-template<typename KeyType>
+template<typename T>
 struct InternalCell{
-    KeyType key;
+    T key;
     uint32_t rowId;
     uint32_t childPage;
 };
 
-template<typename KeyType>
+template<typename T>
 struct LeafNode{
     NodeHeader header;
     uint32_t nextLeaf;
-    LeafCell<KeyType> cells[0];
+    LeafCell<T> cells[0];
 };
 
-template<typename KeyType>
+template<typename T>
 struct InternalNode{
     NodeHeader header;
     uint32_t rightChild;
-    InternalCell<KeyType> cells[0];
+    InternalCell<T> cells[0];
 };
 
-template<typename KeyType>
+template<typename T>
 struct InsertResult{
     bool success;
     bool didSplit;
-    KeyType splitKey;
+    T splitKey;
     uint32_t splitRowId;
     uint32_t rightChildPageNum;
 };
 
 
-template<typename KeyType>
+template<typename T>
 class Btree{
 
 public:
     Btree(Pager* p, Table* t);
     ~Btree();
 
-    void CreateIndex(uint32_t rootPageNum);
+    void CreateIndex();
 
-    InsertResult<KeyType> Insert(KeyType key, uint32_t rowId);
-    void SelectRange(KeyType L, KeyType R, vector<uint32_t>& outRowIds);
-    uint32_t DeleteRange(KeyType L, KeyType R);
+    InsertResult<T> Insert(T key, uint32_t rowId);
+    void SelectRange(T L, T R, vector<uint32_t>& outRowIds);
+    uint32_t DeleteRange(T L, T R);
 
 
-    uint32_t FindLeaf(uint32_t pageNum, KeyType key, uint32_t rowId);
+    uint32_t FindLeaf(uint32_t pageNum, T key, uint32_t rowId);
 
 private:
-    void CreateNewRoot(NodeHeader* root, KeyType splitKey, uint32_t splitRowId, uint32_t rightChildPageNum);
-    void InitializeLeafNode(LeafNode<KeyType>* node);
+    void CreateNewRoot(NodeHeader* root, T splitKey, uint32_t splitRowId, uint32_t rightChildPageNum);
+    void InitializeLeafNode(LeafNode<T>* node);
 
-    uint32_t InternalNodeFindChild(InternalNode<KeyType>* node, KeyType targetKey, uint32_t targetRowId);
-    uint16_t LeafNodeFindSlot(LeafNode<KeyType>* node, KeyType targetKey, uint32_t targetRowId);
+    uint32_t InternalNodeFindChild(InternalNode<T>* node, T targetKey, uint32_t targetRowId);
+    uint16_t LeafNodeFindSlot(LeafNode<T>* node, T targetKey, uint32_t targetRowId);
 
-    InsertResult<KeyType> InternalNodeInsert(InternalNode<KeyType>* node, KeyType key, uint32_t rowId, uint32_t rightChildPage);
-    InsertResult<KeyType> LeafNodeInsert(LeafNode<KeyType>* node, KeyType key, uint32_t rowId);
+    InsertResult<T> InternalNodeInsert(InternalNode<T>* node, T key, uint32_t rowId, uint32_t rightChildPage);
+    InsertResult<T> LeafNodeInsert(LeafNode<T>* node, T key, uint32_t rowId);
 
-    bool LeafNodeInsertNonFull(LeafNode<KeyType>* node, KeyType key, uint32_t rowId);
+    bool LeafNodeInsertNonFull(LeafNode<T>* node, T key, uint32_t rowId);
     
 
-    void InsertIntoParent(NodeHeader* leftChild, KeyType key, uint32_t rowId, uint32_t rightChildPageNum);
-    void UpdateChildParents(InternalNode<KeyType>* parentNode, uint32_t parentPageNum);
+    void InsertIntoParent(NodeHeader* leftChild, T key, uint32_t rowId, uint32_t rightChildPageNum);
+    void UpdateChildParents(InternalNode<T>* parentNode, uint32_t parentPageNum);
 
-    void LeafNodeSelectRange(LeafNode<KeyType>* node, KeyType L, KeyType R, vector<uint32_t>& outRowIds);
-    uint16_t LeafNodeDeleteRange(LeafNode<KeyType>* node, KeyType L, KeyType R);
+    void LeafNodeSelectRange(LeafNode<T>* node, T L, T R, vector<uint32_t>& outRowIds);
+    uint16_t LeafNodeDeleteRange(LeafNode<T>* node, T L, T R);
     
 
 
@@ -104,12 +104,14 @@ public:
     inline static const uint32_t LEAF_NODE_SIZE = 4096;
     inline static const uint32_t INTERNAL_NODE_SIZE = 4096;
     inline static const uint32_t HEADER_SIZE = sizeof(NodeHeader);
-    inline static const uint32_t LEAF_CELL_SIZE = sizeof(LeafCell<KeyType>);
-    inline static const uint32_t INTERNAL_CELL_SIZE = sizeof(InternalCell<KeyType>);
+    inline static const uint32_t LEAF_CELL_SIZE = sizeof(LeafCell<T>);
+    inline static const uint32_t INTERNAL_CELL_SIZE = sizeof(InternalCell<T>);
 
-    inline static const uint32_t LEAF_NODE_MAX_CELLS = (LEAF_NODE_SIZE - sizeof(LeafNode<KeyType>)) / LEAF_CELL_SIZE;
-    inline static const uint32_t INTERNAL_NODE_MAX_CELLS = (INTERNAL_NODE_SIZE - sizeof(InternalNode<KeyType>)) / INTERNAL_CELL_SIZE;
+    inline static const uint32_t LEAF_NODE_MAX_CELLS = (LEAF_NODE_SIZE - sizeof(LeafNode<T>)) / LEAF_CELL_SIZE;
+    inline static const uint32_t INTERNAL_NODE_MAX_CELLS = (INTERNAL_NODE_SIZE - sizeof(InternalNode<T>)) / INTERNAL_CELL_SIZE;
 };
+
+#include "Btree.tpp"
 
 
 
