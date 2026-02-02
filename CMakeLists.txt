@@ -23,7 +23,6 @@ add_executable(DatabaseTests
 	tests/DatabaseTests.cpp
 	Database.cpp
 	Schema.cpp
-	Btree.cpp
 	Pager.cpp
 )
 target_link_libraries(DatabaseTests GTest::gtest_main)
