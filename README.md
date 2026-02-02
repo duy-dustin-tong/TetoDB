@@ -22,7 +22,25 @@ Designed for portability and performance, TetoDB relies on fixed-width binary se
 
 ## 📦 Installation & Build
 
-No external dependencies are required. You only need a C++ compiler (g++, clang, or MSVC).
+No external dependencies are required. You only need a C++ compiler (g++, clang, or MSVC) and CMake.
+
+### How to build
+
+```
+# 1. Create and enter the build directory
+mkdir build && cd build
+
+# 2. Configure the project
+# We use Ninja for faster builds
+cmake -G Ninja ..
+
+# 3. Build the library and executables
+cmake --build .
+```
+
+Once the build is complete, the binaries will be located in the `build/bin/` directory:
+* Main application: `bin/TetoDB`
+* Unit tests: `bin/*Tests`
 
 ### ⚡ Critical: Compile for Performance
 
