@@ -9,7 +9,7 @@ import argparse
 
 # --- CONFIGURATION ---
 DEFAULT_ROWS = 50000
-DB_EXE = "./TetoDB" if os.name != 'nt' else "TetoDB.exe"
+DB_EXE = None
 DB_NAME_PREFIX = "bench_db"
 WAIT_TIME = 5 # Seconds to wait for I/O cooldown
 
@@ -209,13 +209,17 @@ def run_test_suite(table_name, use_index, dataset, query_set, num_rows):
     }
 
 def main():
-    if not os.path.exists(DB_EXE):
-        print(f"Error: {DB_EXE} not found.")
-        return
-
     parser = argparse.ArgumentParser()
     parser.add_argument("rows", nargs="?", type=int, default=DEFAULT_ROWS)
+    parser.add_argument('--exe', default='./build/bin/TetoDB', help='Path to TetoDB executable')
     args = parser.parse_args()
+
+    if not os.path.exists(args.exe):
+        sys.exit(f"Executable not found at {args.exe}")
+    
+    global DB_EXE
+    DB_EXE = args.exe
+    
     num_rows = args.rows
 
     dataset, all_ids = generate_dataset(num_rows)

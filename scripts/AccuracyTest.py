@@ -7,8 +7,7 @@ import re
 import argparse
 import time
 
-# --- CONFIGURATION ---
-DB_EXE = "./TetoDB" if os.name != 'nt' else "TetoDB.exe"
+DB_EXE = None
 DB_NAME_PREFIX = "acc_fuzz_db"
 WAIT_TIME = 2 # Small wait to ensure OS flushes file buffers
 
@@ -160,6 +159,9 @@ def run_test_mode(mode_name, use_index, num_rows, num_queries):
     create_load_script(load_file, table_name, use_index, data)
     create_query_script(query_file, table_name, batch)
     
+    print(f"db exe: {DB_EXE}")
+    print(f"db name prefix: {DB_NAME_PREFIX}")
+
     # 2. Run Load Phase
     print(f"   [EXEC] Loading Data...")
     try:
@@ -186,15 +188,18 @@ def run_test_mode(mode_name, use_index, num_rows, num_queries):
         return False
 
 def main():
-    if not os.path.exists(DB_EXE):
-        print(f"Error: {DB_EXE} not found.")
-        return
-
     parser = argparse.ArgumentParser()
+    parser.add_argument('--exe', default='./build/bin/TetoDB', help='Path to TetoDB executable')
     parser.add_argument("rows", nargs="?", type=int, default=1000, help="Number of rows")
     parser.add_argument("--queries", type=int, default=50, help="Number of queries")
     args = parser.parse_args()
+
+    if not os.path.exists(args.exe):
+        sys.exit(f"Executable not found at {args.exe}")
     
+    global DB_EXE
+    DB_EXE = args.exe
+
     print(f"FUZZ TESTER (Split Persistence): {args.rows} Rows")
     
     pass_no = run_test_mode("No_Index", False, args.rows, args.queries)
