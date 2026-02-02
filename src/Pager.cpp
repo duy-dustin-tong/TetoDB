@@ -1,6 +1,6 @@
 // Pager.cpp
 
-#include "Pager.h"
+#include "tetodb/Pager.h"
 
 #include <iostream>
 #include <algorithm> // for std::max

@@ -1,9 +1,9 @@
 // CommandDispatcher.cpp
 
-#include "CommandDispatcher.h"
-#include "Database.h"
-#include "Schema.h"      // Need full definition of Row/Table to print
-#include "CommandParser.h"
+#include "tetodb/CommandDispatcher.h"
+#include "tetodb/Database.h"
+#include "tetodb/Schema.h"      // Need full definition of Row/Table to print
+#include "tetodb/CommandParser.h"
 
 #include <iostream>
 #include <iomanip> // setw

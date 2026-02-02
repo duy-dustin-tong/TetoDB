@@ -1,7 +1,7 @@
 // CommandParser.cpp
 
-#include "CommandParser.h"
-#include "Common.h"
+#include "tetodb/CommandParser.h"
+#include "tetodb/Common.h"
 
 #include <sstream>
 #include <algorithm>

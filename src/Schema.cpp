@@ -1,8 +1,8 @@
 // Schema.cpp
 
-#include "Schema.h"
-#include "Btree.h"  // Needed for CreateIndex logic
-#include "Pager.h"  // Needed for Pager methods
+#include "tetodb/Schema.h"
+#include "tetodb/Btree.h"  // Needed for CreateIndex logic
+#include "tetodb/Pager.h"  // Needed for Pager methods
 
 #include <cstring>
 #include <iostream>
