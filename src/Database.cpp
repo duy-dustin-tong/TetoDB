@@ -1,9 +1,9 @@
 // Database.cpp
 
-#include "Database.h"
-#include "Schema.h"
-#include "Btree.h"
-#include "Pager.h"
+#include "tetodb/Database.h"
+#include "tetodb/Schema.h"
+#include "tetodb/Btree.h"
+#include "tetodb/Pager.h"
 
 #include <fstream>
 #include <iostream>

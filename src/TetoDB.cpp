@@ -5,8 +5,8 @@
 #include <chrono>
 #include <iomanip> // setprecision
 
-#include "Database.h"
-#include "CommandDispatcher.h"
+#include "tetodb/Database.h"
+#include "tetodb/CommandDispatcher.h"
 
 
 
