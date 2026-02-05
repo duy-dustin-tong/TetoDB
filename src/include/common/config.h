@@ -1,7 +1,16 @@
 // config.h
 
-// Why: Every other component needs to know "How big is a page?" or "What is the ID of an invalid page?"
-// Define:
-//     PAGE_SIZE (Standard is 4096 bytes or 4KB).
-//     INVALID_PAGE_ID (Usually -1).
-//     FRAME_ID_T (Type alias for int32_t).
+#pragma once
+#include <cstdint>
+
+namespace tetodb {
+
+	static constexpr int PAGE_SIZE = 4096;
+	static constexpr int INVALID_PAGE_ID = -1;
+
+	using page_id_t = int32_t;	// identifier for page on disk
+	using frame_id_t = int32_t;	// identifier for page in RAM
+	using txn_id_t = int32_t;	// Transaction ID Type
+	using lsn_t = int32_t;		// Log Sequence Number Type
+
+} // namespace tetodb
