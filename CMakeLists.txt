@@ -1,14 +1,19 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.10)
 
-project(TetoDB)
+# Project Name
+project(tetodb)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Set C++ Standard (We need C++17 for cool features)
+set(CMAKE_CXX_STANDARD 17)
 
-# Define output directories
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+# 1. Include Directories
+# Tells C++ where to look for .h files
+include_directories(src/include)
 
-# Compile database logic into a library and then link the main function and 
-# tests to that library
-add_subdirectory(src)
-add_subdirectory(tests)
+# 2. Gather Source Files
+# (Later we will be more specific, but for now, this grabs all .cpp files)
+file(GLOB_RECURSE SOURCES "src/*.cpp")
+
+# 3. Create the Executable
+# Creates a program named "teto_shell" using the source files
+add_executable(teto_shell tools/shell/shell.cpp ${SOURCES})
