@@ -59,6 +59,8 @@ namespace tetodb {
 
 	Page* BufferPoolManager::NewPage(page_id_t* page_id) {
 
+		std::scoped_lock<std::mutex> lock(latch_);
+
 		frame_id_t frame_id = INVALID_FRAME_ID;
 		
 		if (!GetFreeFrame(&frame_id)) {
@@ -85,6 +87,8 @@ namespace tetodb {
 	}
 
 	Page* BufferPoolManager::FetchPage(page_id_t page_id) { 
+		std::scoped_lock<std::mutex> lock(latch_);
+
 		auto& it = page_table_.find(page_id);
 		if (it != page_table_.end()) {
 			frame_id_t frame_id = it->second;
@@ -122,6 +126,8 @@ namespace tetodb {
 
 
 	bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) { 
+		std::scoped_lock<std::mutex> lock(latch_);
+
 		auto& it = page_table_.find(page_id);
 		if (it == page_table_.end()) {
 			return false;
@@ -146,6 +152,8 @@ namespace tetodb {
 	}
 
 	bool BufferPoolManager::DeletePage(page_id_t page_id) {
+		std::scoped_lock<std::mutex> lock(latch_);
+
 		auto& it = page_table_.find(page_id);
 		if (it == page_table_.end()) {
 			disk_manager_->DeallocatePage(page_id);
@@ -174,6 +182,8 @@ namespace tetodb {
 	}
 
 	bool BufferPoolManager::FlushPage(page_id_t page_id) { 
+		std::scoped_lock<std::mutex> lock(latch_);
+
 		auto& it = page_table_.find(page_id);
 		if (it == page_table_.end()) {
 			return false;
@@ -191,6 +201,8 @@ namespace tetodb {
 	}
 
 	void BufferPoolManager::FlushAllPages() {
+		std::scoped_lock<std::mutex> lock(latch_);
+
 		for (size_t i = 0; i < pool_size_; i++) {
 			Page* page = &pages_[i];
 			if (page->page_id_ != INVALID_PAGE_ID && page->is_dirty_) {

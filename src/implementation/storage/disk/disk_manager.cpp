@@ -26,6 +26,10 @@ namespace tetodb {
 	}
 
 	void DiskManager::WritePage(page_id_t page_id, const char* page_data) {
+		std::scoped_lock<std::mutex> lock(latch_);
+
+		db_io_.clear();
+
 		size_t offset = static_cast<size_t> (page_id) * PAGE_SIZE;
 		db_io_.seekp(offset);
 		db_io_.write(page_data, PAGE_SIZE);
@@ -35,13 +39,11 @@ namespace tetodb {
 	}
 
 	void DiskManager::ReadPage(page_id_t page_id, char* page_data) {
+		std::scoped_lock<std::mutex> lock(latch_);
+
 		size_t offset = static_cast<size_t> (page_id) * PAGE_SIZE;
 
-		if (offset >= GetFileSize()) {
-			// if nonexisting page, return 0s
-			std::fill(page_data, page_data + PAGE_SIZE, 0);
-			return;
-		}
+		db_io_.clear();
 
 		db_io_.seekg(offset);
 		db_io_.read(page_data, PAGE_SIZE);

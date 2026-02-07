@@ -53,6 +53,8 @@ namespace tetodb {
         bool GetFreeFrame(frame_id_t* frame_id);
 
     private:
+        std::mutex latch_;
+
         std::unique_ptr<char[], AlignedDeleter> data_pool_;
         std::vector<Page> pages_;
 
