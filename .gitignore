@@ -9,3 +9,18 @@
 /build
 *.tmp
 
+# CMake & Ninja Build Artifacts
+/CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+build.ninja
+compile_commands.json
+
+# Database & Log Files
+*.log
+e2e.log
+e2e.catalog
+
+# Test SQL Scripts
+test.sql
+test_free.sql
