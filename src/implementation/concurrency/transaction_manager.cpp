@@ -5,7 +5,6 @@
 #include "storage/table/table_heap.h"
 #include <iostream>
 
-
 namespace tetodb {
 
 Transaction *TransactionManager::Begin(IsolationLevel isolation_level) {
@@ -53,6 +52,7 @@ void TransactionManager::Commit(Transaction *txn) {
   txn->SetState(TransactionState::COMMITTED);
 
   ReleaseLocks(txn);
+  GarbageCollect(txn->GetTransactionId());
 }
 
 void TransactionManager::Abort(Transaction *txn) {
@@ -108,6 +108,7 @@ void TransactionManager::Abort(Transaction *txn) {
   }
 
   ReleaseLocks(txn);
+  GarbageCollect(txn->GetTransactionId());
 }
 
 void TransactionManager::ReleaseLocks(Transaction *txn) {
