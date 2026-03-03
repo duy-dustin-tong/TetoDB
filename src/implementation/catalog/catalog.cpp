@@ -77,7 +77,7 @@ bool Catalog::CreateTable(const std::string &table_name, const Schema &schema,
     CreateIndex(pk_name, table_oid, primary_keys, true, nullptr);
   }
 
-  SaveCatalog("e2e.catalog");
+  SaveCatalog(catalog_path_);
 
   return true;
 }
@@ -250,7 +250,7 @@ Catalog::CreateIndex(const std::string &index_name,
       CreateIndex(index_name, table_meta->oid_, key_attrs, is_unique, txn);
 
   if (result) {
-    SaveCatalog("e2e.catalog");
+    SaveCatalog(catalog_path_);
   }
   return result;
 }
@@ -355,7 +355,7 @@ bool Catalog::DropTable(const std::string &table_name) {
 
   lock.unlock();
 
-  SaveCatalog("e2e.catalog");
+  SaveCatalog(catalog_path_);
 
   return true;
 }

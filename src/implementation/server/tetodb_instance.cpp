@@ -44,14 +44,16 @@ TetoDBInstance::TetoDBInstance(const std::string &db_file_name) {
   lock_mgr_ = std::make_unique<LockManager>();
   txn_mgr_ =
       std::make_unique<TransactionManager>(lock_mgr_.get(), log_mgr_.get());
-  catalog_ = std::make_unique<Catalog>(bpm_.get(), log_mgr_.get());
+  std::string catalog_path =
+      db_file_name.substr(0, db_file_name.find_last_of('.')) + ".catalog";
+  catalog_ =
+      std::make_unique<Catalog>(catalog_path, bpm_.get(), log_mgr_.get());
 
   checkpoint_mgr_ = std::make_unique<CheckpointManager>(
       txn_mgr_.get(), log_mgr_.get(), bpm_.get());
   checkpoint_mgr_->StartCheckpointer(std::chrono::seconds(5));
 
-  catalog_->LoadCatalog(db_file_name.substr(0, db_file_name.find_last_of('.')) +
-                        ".catalog");
+  catalog_->LoadCatalog(catalog_path);
   std::cout << "[SYSTEM] TetoDB Instance Online. Awaiting connections.\n";
 }
 
