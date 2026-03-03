@@ -470,8 +470,7 @@ std::unique_ptr<Expr> Parser::ParseBaseExpression() {
   std::transform(upper_val.begin(), upper_val.end(), upper_val.begin(),
                  ::toupper);
 
-  if ((Peek().type_ == TokenType::KEYWORD ||
-       Peek().type_ == TokenType::IDENTIFIER) &&
+  if (Peek().type_ == TokenType::KEYWORD &&
       (upper_val == "COUNT" || upper_val == "SUM" || upper_val == "MIN" ||
        upper_val == "MAX" || upper_val == "AVG" || upper_val == "AVERAGE" ||
        upper_val == "MED" || upper_val == "MEDIAN")) {
