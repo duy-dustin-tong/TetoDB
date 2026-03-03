@@ -62,28 +62,7 @@ add_library(tetodb_lib
  "src/include/execution/expressions/parameter_value_expression.h")
 
 # 3. Create the Server Executable (make sure this is named server_main.cpp)
-add_executable(teto_main 
-    "src/server_main.cpp" 
-    "src/include/execution/plans/insert_plan.h" 
-    "src/include/execution/plans/delete_plan.h" 
-    "src/include/execution/plans/filter_plan.h" 
-    "src/include/execution/executors/filter_executor.h" 
-    "src/implementation/execution/executors/filter_executor.cpp" 
-    "src/include/execution/plans/sort_plan.h" 
-    "src/include/execution/executors/sort_executor.h" 
-    "src/implementation/execution/executors/sort_executor.cpp" 
-    "src/include/execution/plans/limit_plan.h" 
-    "src/include/execution/executors/limit_executor.h" 
-    "src/implementation/execution/executors/limit_executor.cpp" 
-    "src/implementation/recovery/checkpoint_manager.cpp" 
-    "src/include/concurrency/index_write_record.h" 
-    "src/include/execution/plans/topn_plan.h" 
-    "src/include/execution/executors/topn_executor.h" 
-    "src/implementation/execution/executors/topn_executor.cpp" 
-    "src/implementation/server/tetodb_instance.cpp" 
-    "src/include/server/tcp_server.h" 
-    "src/implementation/server/tcp_server.cpp"
- "src/include/execution/expressions/parameter_value_expression.h")
+add_executable(teto_main "src/server_main.cpp")
 
 # 4. Create the Client Executable
 add_executable(teto_client "src/client_main.cpp" "src/include/execution/expressions/parameter_value_expression.h")
