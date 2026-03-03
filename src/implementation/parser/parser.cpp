@@ -258,9 +258,19 @@ std::unique_ptr<CreateTableStatement> Parser::ParseCreateTable() {
       if (Match(TokenType::KEYWORD, "PRIMARY")) {
         if (Match(TokenType::KEYWORD, "KEY")) {
           col.is_primary_key_ = true;
+          col.is_not_null_ = true; // PK is implicitly NOT NULL
         } else {
           throw std::runtime_error(
               "Syntax Error: Expected 'KEY' after 'PRIMARY'");
+        }
+      }
+
+      // Parse NOT NULL constraint (can appear after PRIMARY KEY or standalone)
+      if (Match(TokenType::KEYWORD, "NOT")) {
+        if (Match(TokenType::KEYWORD, "NULL")) {
+          col.is_not_null_ = true;
+        } else {
+          throw std::runtime_error("Syntax Error: Expected 'NULL' after 'NOT'");
         }
       }
 

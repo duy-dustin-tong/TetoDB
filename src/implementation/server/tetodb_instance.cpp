@@ -260,9 +260,8 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
         Column col(c.name_, tid);
         if (c.is_primary_key_) {
           pk_cols.push_back(col_idx);
-          col.SetNullable(false);
-        } else
-          col.SetNullable(true);
+        }
+        col.SetNullable(!c.is_not_null_ && !c.is_primary_key_);
         cols.push_back(col);
         col_idx++;
       }

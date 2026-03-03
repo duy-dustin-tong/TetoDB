@@ -233,8 +233,8 @@ struct ColumnDef {
   std::string name_;
   std::string type_;
 
-  // --- NEW: The flag that tells the Catalog to build an index ---
   bool is_primary_key_ = false;
+  bool is_not_null_ = false;
 
   ColumnDef(std::string name, std::string type)
       : name_(std::move(name)), type_(std::move(type)) {}
