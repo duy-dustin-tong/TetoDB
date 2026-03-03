@@ -157,8 +157,11 @@ void TcpServer::HandleClient(SOCKET client_socket) {
     return;
   }
 
-  uint32_t len = ntohl(*reinterpret_cast<uint32_t *>(buffer));
-  uint32_t protocol = ntohl(*reinterpret_cast<uint32_t *>(buffer + 4));
+  uint32_t raw_len, raw_protocol;
+  std::memcpy(&raw_len, buffer, sizeof(uint32_t));
+  std::memcpy(&raw_protocol, buffer + 4, sizeof(uint32_t));
+  uint32_t len = ntohl(raw_len);
+  uint32_t protocol = ntohl(raw_protocol);
 
   if (protocol == 80877103) {       // SSLRequest
     send(client_socket, "N", 1, 0); // Deny SSL
@@ -167,7 +170,9 @@ void TcpServer::HandleClient(SOCKET client_socket) {
       CLOSE_SOCKET(client_socket);
       return;
     } // Read real Startup header
-    len = ntohl(*reinterpret_cast<uint32_t *>(buffer));
+    uint32_t raw_len_2;
+    std::memcpy(&raw_len_2, buffer, sizeof(uint32_t));
+    len = ntohl(raw_len_2);
   }
 
   // --- THE FIX: Clear the TCP Buffer of all connection params! ---
