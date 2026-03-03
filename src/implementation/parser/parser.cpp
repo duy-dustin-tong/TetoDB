@@ -189,24 +189,10 @@ std::unique_ptr<CreateTableStatement> Parser::ParseCreateTable() {
 
   Consume(TokenType::SYMBOL, "Expected '(' to start table definitions");
 
-  // --- CORE FIX: Completely bypass TokenType to prevent lexer taxonomy
-  // failures ---
-  auto match_text = [&](const std::string &expected) {
-    if (cursor_ >= tokens_.size())
-      return false;
-    std::string current = tokens_[cursor_].value_;
-    std::transform(current.begin(), current.end(), current.begin(), ::toupper);
-    if (current == expected) {
-      cursor_++;
-      return true;
-    }
-    return false;
-  };
-
   do {
     // --- BRANCH 1: FOREIGN KEY CONSTRAINT ---
-    if (match_text("FOREIGN")) {
-      if (!match_text("KEY"))
+    if (Match(TokenType::KEYWORD, "FOREIGN")) {
+      if (!Match(TokenType::KEYWORD, "KEY"))
         throw std::runtime_error(
             "Syntax Error: Expected 'KEY' after 'FOREIGN'");
 
@@ -215,7 +201,7 @@ std::unique_ptr<CreateTableStatement> Parser::ParseCreateTable() {
       std::string child_col = tokens_[cursor_ - 1].value_;
       Consume(TokenType::SYMBOL, "Expected ')'");
 
-      if (!match_text("REFERENCES"))
+      if (!Match(TokenType::KEYWORD, "REFERENCES"))
         throw std::runtime_error("Syntax Error: Expected 'REFERENCES'");
 
       Consume(TokenType::IDENTIFIER, "Expected parent table");
@@ -229,22 +215,24 @@ std::unique_ptr<CreateTableStatement> Parser::ParseCreateTable() {
       ReferentialAction on_delete = ReferentialAction::RESTRICT;
       ReferentialAction on_update = ReferentialAction::RESTRICT;
 
-      while (match_text("ON")) {
-        if (match_text("DELETE")) {
-          if (match_text("CASCADE"))
+      while (Match(TokenType::KEYWORD, "ON")) {
+        if (Match(TokenType::KEYWORD, "DELETE")) {
+          if (Match(TokenType::KEYWORD, "CASCADE"))
             on_delete = ReferentialAction::CASCADE;
-          else if (match_text("SET") && match_text("NULL"))
+          else if (Match(TokenType::KEYWORD, "SET") &&
+                   Match(TokenType::KEYWORD, "NULL"))
             on_delete = ReferentialAction::SET_NULL;
-          else if (match_text("RESTRICT"))
+          else if (Match(TokenType::KEYWORD, "RESTRICT"))
             on_delete = ReferentialAction::RESTRICT;
           else
             throw std::runtime_error("Syntax Error: Invalid ON DELETE action");
-        } else if (match_text("UPDATE")) {
-          if (match_text("CASCADE"))
+        } else if (Match(TokenType::KEYWORD, "UPDATE")) {
+          if (Match(TokenType::KEYWORD, "CASCADE"))
             on_update = ReferentialAction::CASCADE;
-          else if (match_text("SET") && match_text("NULL"))
+          else if (Match(TokenType::KEYWORD, "SET") &&
+                   Match(TokenType::KEYWORD, "NULL"))
             on_update = ReferentialAction::SET_NULL;
-          else if (match_text("RESTRICT"))
+          else if (Match(TokenType::KEYWORD, "RESTRICT"))
             on_update = ReferentialAction::RESTRICT;
           else
             throw std::runtime_error("Syntax Error: Invalid ON UPDATE action");
@@ -267,8 +255,8 @@ std::unique_ptr<CreateTableStatement> Parser::ParseCreateTable() {
 
       ColumnDef col(col_name, col_type);
 
-      if (match_text("PRIMARY")) {
-        if (match_text("KEY")) {
+      if (Match(TokenType::KEYWORD, "PRIMARY")) {
+        if (Match(TokenType::KEYWORD, "KEY")) {
           col.is_primary_key_ = true;
         } else {
           throw std::runtime_error(

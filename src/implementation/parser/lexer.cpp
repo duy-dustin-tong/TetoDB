@@ -16,7 +16,7 @@ const std::unordered_set<std::string> Lexer::keywords_ = {
     "COMMIT",     "ROLLBACK",   "DROP",    "EXPLAIN", "SAVEPOINT", "RELEASE",
     "DEALLOCATE", "TO",         "ALL",     "NULL",    "IS",        "NOT",
     "BOOLEAN",    "DECIMAL",    "FLOAT",   "DATE",    "TIMESTAMP", "TRUE",
-    "FALSE"};
+    "FALSE",      "RESTRICT"};
 
 Lexer::Lexer(const std::string &input) : input_(input), cursor_(0) {}
 
@@ -87,16 +87,6 @@ Token Lexer::ReadIdentifierOrKeyword() {
   std::string upper_value = value;
   std::transform(upper_value.begin(), upper_value.end(), upper_value.begin(),
                  ::toupper);
-
-  // ==========================================
-  // NEW: Intercept PRIMARY and KEY specifically
-  // ==========================================
-  if (upper_value == "PRIMARY") {
-    return {TokenType::PRIMARY, upper_value};
-  }
-  if (upper_value == "KEY") {
-    return {TokenType::KEY, upper_value};
-  }
 
   // Standardize remaining keywords
   if (keywords_.find(upper_value) != keywords_.end()) {
