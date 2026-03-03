@@ -27,6 +27,7 @@ add_library(tetodb_lib
     src/implementation/concurrency/lock_manager.cpp
     src/implementation/concurrency/transaction_manager.cpp
     src/implementation/execution/executors/delete_executor.cpp
+    src/implementation/execution/fk_constraint_handler.cpp
     src/implementation/execution/executors/update_executor.cpp
     src/implementation/recovery/log_record.cpp
     src/implementation/recovery/log_manager.cpp
