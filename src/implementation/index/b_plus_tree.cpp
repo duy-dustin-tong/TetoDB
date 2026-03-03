@@ -80,7 +80,7 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType &key,
     return found;
   } catch (Exception &e) {
     UnlockUnpinPages(transaction);
-    throw e;
+    throw;
   }
 }
 /*****************************************************************************
@@ -207,7 +207,7 @@ bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value,
 
   } catch (Exception &e) {
     UnlockUnpinPages(transaction);
-    throw e;
+    throw;
   }
 }
 
@@ -229,7 +229,7 @@ bool BPLUSTREE_TYPE::Remove(const KeyType &key, const ValueType &value,
     return RemoveFromLeaf(key, value, transaction);
   } catch (Exception &e) {
     UnlockUnpinPages(transaction);
-    throw e;
+    throw;
   }
 }
 
@@ -281,7 +281,7 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value,
         InsertIntoParent(leaf, new_leaf->KeyAt(0), new_leaf, transaction);
       } catch (Exception &e) {
         buffer_pool_manager_->UnpinPage(new_leaf->GetPageId(), false);
-        throw e;
+        throw;
       }
 
       buffer_pool_manager_->UnpinPage(new_leaf->GetPageId(), true);
@@ -289,7 +289,7 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value,
   } catch (Exception &e) {
     page->WUnlatch();
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
-    throw e;
+    throw;
   }
 
   page->WUnlatch();
@@ -323,7 +323,7 @@ bool BPLUSTREE_TYPE::RemoveFromLeaf(const KeyType &key, const ValueType &value,
   } catch (Exception &e) {
     page->WUnlatch();
     buffer_pool_manager_->UnpinPage(leaf->GetPageId(), true);
-    throw e;
+    throw;
   }
 
   page->WUnlatch();
@@ -403,14 +403,14 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
         InsertIntoParent(parent, new_parent->KeyAt(0), new_parent, transaction);
       } catch (Exception &e) {
         buffer_pool_manager_->UnpinPage(new_parent->GetPageId(), false);
-        throw e;
+        throw;
       }
 
       buffer_pool_manager_->UnpinPage(new_parent->GetPageId(), true);
     }
   } catch (Exception &e) {
     buffer_pool_manager_->UnpinPage(parent_id, true);
-    throw e;
+    throw;
   }
 
   buffer_pool_manager_->UnpinPage(parent_id, true);
