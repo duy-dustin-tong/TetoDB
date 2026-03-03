@@ -6,7 +6,6 @@
 #include <iostream>
 #include <vector>
 
-
 namespace tetodb {
 
 void RecoveryManager::Redo() {
@@ -23,10 +22,11 @@ void RecoveryManager::Redo() {
   while (true) {
     // 1. Peek at the first 4 bytes (the size of the record)
     uint32_t record_size;
-    if (!log_file.read(reinterpret_cast<char *>(&record_size),
-                       sizeof(uint32_t))) {
+    char size_buf[sizeof(uint32_t)];
+    if (!log_file.read(size_buf, sizeof(uint32_t))) {
       break; // Clean EOF
     }
+    std::memcpy(&record_size, size_buf, sizeof(uint32_t));
 
     // ==========================================
     // FIX 1: PARTIAL CRASH WRITE PROTECTION
@@ -160,7 +160,9 @@ void RecoveryManager::Undo() {
       uint32_t offset = offset_it->second;
       log_file.seekg(offset);
       uint32_t record_size;
-      log_file.read(reinterpret_cast<char *>(&record_size), sizeof(uint32_t));
+      char size_buf[sizeof(uint32_t)];
+      log_file.read(size_buf, sizeof(uint32_t));
+      std::memcpy(&record_size, size_buf, sizeof(uint32_t));
 
       std::vector<char> buffer(record_size);
       std::memcpy(buffer.data(), &record_size, sizeof(uint32_t));
