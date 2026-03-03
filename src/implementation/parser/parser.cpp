@@ -424,10 +424,30 @@ std::unique_ptr<Expr> Parser::ParseExpression() {
     return std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
   }
 
+  if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "IS") {
+    Advance();
+    std::string op = "IS_NULL";
+    if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "NOT") {
+      Advance();
+      op = "IS_NOT_NULL";
+    }
+    if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "NULL") {
+      Advance();
+      return std::make_unique<BinaryExpr>(
+          std::move(left), op, std::make_unique<ConstantExpr>("NULL"));
+    } else {
+      throw std::runtime_error("Syntax Error: Expected 'NULL' after 'IS'");
+    }
+  }
+
   return left;
 }
 
 std::unique_ptr<Expr> Parser::ParseBaseExpression() {
+  if (Match(TokenType::KEYWORD, "NULL")) {
+    return std::make_unique<ConstantExpr>("NULL");
+  }
+
   if (Match(TokenType::NUMBER)) {
     return std::make_unique<ConstantExpr>(tokens_[cursor_ - 1].value_);
   }
