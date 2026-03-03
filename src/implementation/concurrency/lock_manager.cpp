@@ -69,7 +69,9 @@ bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
     if (req.txn_id_ == txn->GetTransactionId()) {
       if (req.lock_mode_ == LockMode::EXCLUSIVE)
         return true;
-      return false;
+      // Already holding Shared — release our latch and delegate to upgrade
+      lock.unlock();
+      return LockUpgrade(txn, rid);
     }
   }
 
@@ -119,9 +121,10 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
   txn->GetExclusiveLockSet()->erase(rid);
 
   // 2. Find the queue
-  if (lock_table_.find(rid) == lock_table_.end())
+  auto table_it = lock_table_.find(rid);
+  if (table_it == lock_table_.end())
     return false;
-  LockRequestQueue &queue = lock_table_[rid];
+  LockRequestQueue &queue = table_it->second;
 
   // 3. Find our request and remove it
   bool found = false;
