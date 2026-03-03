@@ -175,7 +175,12 @@ void TcpServer::HandleClient(SOCKET client_socket) {
     len = ntohl(raw_len_2);
   }
 
-  // --- THE FIX: Clear the TCP Buffer of all connection params! ---
+  // --- Cap startup packet length to prevent OOM ---
+  static constexpr uint32_t MAX_STARTUP_LEN = 1024 * 1024; // 1 MB
+  if (len > MAX_STARTUP_LEN) {
+    CLOSE_SOCKET(client_socket);
+    return;
+  }
   if (len > 8) {
     std::vector<char> discard(len - 8);
     RecvAll(client_socket, discard.data(), len - 8);
@@ -220,6 +225,14 @@ void TcpServer::HandleClient(SOCKET client_socket) {
     uint32_t raw_msg_len;
     std::memcpy(&raw_msg_len, buffer + 1, sizeof(uint32_t));
     uint32_t msg_len = ntohl(raw_msg_len);
+
+    // --- Cap query length to prevent OOM from malicious clients ---
+    static constexpr uint32_t MAX_QUERY_LEN = 16 * 1024 * 1024; // 16 MB
+    if (msg_len > MAX_QUERY_LEN) {
+      std::cerr << "[SERVER] Rejecting oversized packet: " << msg_len
+                << " bytes\n";
+      break;
+    }
 
     if (msg_type == 'X')
       break;
