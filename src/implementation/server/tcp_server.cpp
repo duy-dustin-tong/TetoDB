@@ -217,7 +217,9 @@ void TcpServer::HandleClient(SOCKET client_socket) {
       break;
 
     char msg_type = buffer[0];
-    uint32_t msg_len = ntohl(*reinterpret_cast<uint32_t *>(buffer + 1));
+    uint32_t raw_msg_len;
+    std::memcpy(&raw_msg_len, buffer + 1, sizeof(uint32_t));
+    uint32_t msg_len = ntohl(raw_msg_len);
 
     if (msg_type == 'X')
       break;
@@ -327,20 +329,28 @@ void TcpServer::HandleClient(SOCKET client_socket) {
       p += stmt_name.length() + 1;
 
       // Read parameter format codes (0=text, 1=binary)
-      int16_t num_formats = ntohs(*reinterpret_cast<const int16_t *>(p));
+      int16_t raw_formats;
+      std::memcpy(&raw_formats, p, sizeof(int16_t));
+      int16_t num_formats = ntohs(raw_formats);
       p += 2;
       std::vector<int16_t> formats(num_formats);
       for (int i = 0; i < num_formats; i++) {
-        formats[i] = ntohs(*reinterpret_cast<const int16_t *>(p));
+        int16_t format_val;
+        std::memcpy(&format_val, p, sizeof(int16_t));
+        formats[i] = ntohs(format_val);
         p += 2;
       }
 
-      int16_t num_params = ntohs(*reinterpret_cast<const int16_t *>(p));
+      int16_t raw_params;
+      std::memcpy(&raw_params, p, sizeof(int16_t));
+      int16_t num_params = ntohs(raw_params);
       p += 2;
 
       session.current_parameters.clear();
       for (int i = 0; i < num_params; i++) {
-        int32_t param_len = ntohl(*reinterpret_cast<const int32_t *>(p));
+        int32_t raw_param_len;
+        std::memcpy(&raw_param_len, p, sizeof(int32_t));
+        int32_t param_len = ntohl(raw_param_len);
         p += 4;
         if (param_len == -1) {
           session.current_parameters.push_back(
@@ -355,7 +365,9 @@ void TcpServer::HandleClient(SOCKET client_socket) {
           }
           if (fmt == 1 && param_len == 4) {
             // Binary int32 (big-endian)
-            int32_t val = ntohl(*reinterpret_cast<const uint32_t *>(p));
+            uint32_t raw_val;
+            std::memcpy(&raw_val, p, sizeof(uint32_t));
+            int32_t val = ntohl(raw_val);
             p += param_len;
             session.current_parameters.push_back(Value(TypeId::INTEGER, val));
           } else if (fmt == 1 && param_len == 8) {

@@ -94,7 +94,9 @@ int main() {
     char len_buf[4];
     if (!RecvAll(sock, len_buf, 4))
       break;
-    uint32_t len = ntohl(*reinterpret_cast<uint32_t *>(len_buf)) - 4;
+    uint32_t raw_len;
+    std::memcpy(&raw_len, len_buf, sizeof(uint32_t));
+    uint32_t len = ntohl(raw_len) - 4;
 
     std::vector<char> payload(len);
     if (len > 0 && !RecvAll(sock, payload.data(), len))
@@ -134,14 +136,16 @@ int main() {
     } else if (type_byte == 'D') { // DataRow
       // Unpack all columns in the DataRow
       if (len >= 2) {
-        uint16_t num_cols =
-            ntohs(*reinterpret_cast<uint16_t *>(payload.data()));
+        uint16_t raw_num_cols;
+        std::memcpy(&raw_num_cols, payload.data(), sizeof(uint16_t));
+        uint16_t num_cols = ntohs(raw_num_cols);
         uint32_t offset = 2;
         for (uint16_t i = 0; i < num_cols; i++) {
           if (offset + 4 > len)
             break;
-          uint32_t col_len =
-              ntohl(*reinterpret_cast<uint32_t *>(payload.data() + offset));
+          uint32_t raw_col_len;
+          std::memcpy(&raw_col_len, payload.data() + offset, sizeof(uint32_t));
+          uint32_t col_len = ntohl(raw_col_len);
           offset += 4;
           if (col_len == 0xFFFFFFFF) {
             std::cout << "NULL";
