@@ -78,38 +78,39 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
 
   if (lower_sql.find("select pg_catalog.version()") != std::string::npos ||
       lower_sql.find("select version()") != std::string::npos) {
-    static Schema version_schema({Column("version", TypeId::VARCHAR)});
-    res.schema = &version_schema;
-    res.rows.push_back(
-        Tuple({Value(TypeId::VARCHAR, "PostgreSQL 14.0 on TetoDB")},
-              &version_schema));
+    res.owned_schema = std::make_shared<Schema>(
+        std::vector<Column>{Column("version", TypeId::VARCHAR)});
+    res.schema = res.owned_schema.get();
+    res.rows.push_back(Tuple(
+        {Value(TypeId::VARCHAR, "PostgreSQL 14.0 on TetoDB")}, res.schema));
     res.status_msg = "SELECT 1";
     return res;
   }
 
   if (lower_sql.find("select current_schema()") != std::string::npos) {
-    static Schema schema_schema({Column("current_schema", TypeId::VARCHAR)});
-    res.schema = &schema_schema;
-    res.rows.push_back(
-        Tuple({Value(TypeId::VARCHAR, "public")}, &schema_schema));
+    res.owned_schema = std::make_shared<Schema>(
+        std::vector<Column>{Column("current_schema", TypeId::VARCHAR)});
+    res.schema = res.owned_schema.get();
+    res.rows.push_back(Tuple({Value(TypeId::VARCHAR, "public")}, res.schema));
     res.status_msg = "SELECT 1";
     return res;
   }
 
   if (lower_sql.find("show standard_conforming_strings") != std::string::npos) {
-    static Schema scs_schema(
-        {Column("standard_conforming_strings", TypeId::VARCHAR)});
-    res.schema = &scs_schema;
-    res.rows.push_back(Tuple({Value(TypeId::VARCHAR, "on")}, &scs_schema));
+    res.owned_schema = std::make_shared<Schema>(std::vector<Column>{
+        Column("standard_conforming_strings", TypeId::VARCHAR)});
+    res.schema = res.owned_schema.get();
+    res.rows.push_back(Tuple({Value(TypeId::VARCHAR, "on")}, res.schema));
     res.status_msg = "SHOW";
     return res;
   }
 
   // Generic fallback for any other SHOW configuration commands
   if (lower_sql.rfind("show ", 0) == 0) {
-    static Schema show_schema({Column("setting", TypeId::VARCHAR)});
-    res.schema = &show_schema;
-    res.rows.push_back(Tuple({Value(TypeId::VARCHAR, "on")}, &show_schema));
+    res.owned_schema = std::make_shared<Schema>(
+        std::vector<Column>{Column("setting", TypeId::VARCHAR)});
+    res.schema = res.owned_schema.get();
+    res.rows.push_back(Tuple({Value(TypeId::VARCHAR, "on")}, res.schema));
     res.status_msg = "SHOW";
     return res;
   }
@@ -123,26 +124,24 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
   // --- NEW: Intercept SQLAlchemy's String Encoding Pings ---
   if (lower_sql.find("cast('test plain returns'") != std::string::npos ||
       lower_sql.find("cast('test unicode returns'") != std::string::npos) {
-    static Schema cast_schema({Column("anon_1", TypeId::VARCHAR)});
-    res.schema = &cast_schema;
+    res.owned_schema = std::make_shared<Schema>(
+        std::vector<Column>{Column("anon_1", TypeId::VARCHAR)});
+    res.schema = res.owned_schema.get();
     res.rows.push_back(
-        Tuple({Value(TypeId::VARCHAR, "test plain returns")}, &cast_schema));
+        Tuple({Value(TypeId::VARCHAR, "test plain returns")}, res.schema));
     res.status_msg = "SELECT 1";
     return res;
   }
 
   // --- PostgreSQL System Catalog Queries ---
-  // psycopg3/libpq sends queries to pg_type, pg_range, pg_catalog
-  // for type discovery. TetoDB doesn't implement system catalogs,
-  // so we return empty result sets to let the driver proceed.
   if (lower_sql.find("pg_type") != std::string::npos ||
       lower_sql.find("pg_range") != std::string::npos ||
       lower_sql.find("pg_catalog") != std::string::npos ||
       lower_sql.find("pg_attribute") != std::string::npos ||
       lower_sql.find("information_schema") != std::string::npos) {
-    // Return an empty result set with a generic schema
-    static Schema pg_schema({Column("name", TypeId::VARCHAR)});
-    res.schema = &pg_schema;
+    res.owned_schema = std::make_shared<Schema>(
+        std::vector<Column>{Column("name", TypeId::VARCHAR)});
+    res.schema = res.owned_schema.get();
     res.status_msg = "SELECT 0";
     return res;
   }
