@@ -298,7 +298,11 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
           ExecutionEngine::CreateExecutor(physical_plan, &exec_ctx);
       root_executor->Init();
 
-      res.schema = root_executor->GetOutputSchema();
+      if (root_executor->GetOutputSchema()) {
+        res.owned_schema =
+            std::make_shared<Schema>(*root_executor->GetOutputSchema());
+        res.schema = res.owned_schema.get();
+      }
       Tuple tuple;
       RID rid;
       while (root_executor->Next(&tuple, &rid)) {
