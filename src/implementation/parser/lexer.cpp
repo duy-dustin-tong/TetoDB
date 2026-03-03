@@ -15,7 +15,8 @@ const std::unordered_set<std::string> Lexer::keywords_ = {
     "FOREIGN",    "REFERENCES", "CASCADE", "LIKE",    "ILIKE",     "BEGIN",
     "COMMIT",     "ROLLBACK",   "DROP",    "EXPLAIN", "SAVEPOINT", "RELEASE",
     "DEALLOCATE", "TO",         "ALL",     "NULL",    "IS",        "NOT",
-    "BOOLEAN",    "DECIMAL",    "FLOAT",   "DATE",    "TIMESTAMP"};
+    "BOOLEAN",    "DECIMAL",    "FLOAT",   "DATE",    "TIMESTAMP", "TRUE",
+    "FALSE"};
 
 Lexer::Lexer(const std::string &input) : input_(input), cursor_(0) {}
 

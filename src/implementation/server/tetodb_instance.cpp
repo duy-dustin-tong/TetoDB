@@ -244,10 +244,20 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
       std::vector<Column> cols;
       std::vector<uint32_t> pk_cols;
       uint32_t col_idx = 0;
+      static const std::unordered_map<std::string, TypeId> type_map = {
+          {"INT", TypeId::INTEGER},     {"INTEGER", TypeId::INTEGER},
+          {"BIGINT", TypeId::BIGINT},   {"SMALLINT", TypeId::SMALLINT},
+          {"TINYINT", TypeId::TINYINT}, {"BOOLEAN", TypeId::BOOLEAN},
+          {"BOOL", TypeId::BOOLEAN},    {"DECIMAL", TypeId::DECIMAL},
+          {"FLOAT", TypeId::DECIMAL},   {"DOUBLE", TypeId::DECIMAL},
+          {"DATE", TypeId::TIMESTAMP},  {"TIMESTAMP", TypeId::TIMESTAMP},
+          {"VARCHAR", TypeId::VARCHAR}, {"TEXT", TypeId::VARCHAR},
+          {"CHAR", TypeId::CHAR},
+      };
       for (const auto &c : create_stmt->columns_) {
-        TypeId tid = (c.type_ == "INT" || c.type_ == "INTEGER")
-                         ? TypeId::INTEGER
-                         : TypeId::VARCHAR;
+        auto type_it = type_map.find(c.type_);
+        TypeId tid =
+            (type_it != type_map.end()) ? type_it->second : TypeId::VARCHAR;
         Column col(c.name_, tid);
         if (c.is_primary_key_) {
           pk_cols.push_back(col_idx);

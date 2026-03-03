@@ -11,7 +11,6 @@
 #include "execution/plans/sort_plan.h"
 #include <unordered_map>
 
-
 namespace tetodb {
 
 // --- UPDATED: Take raw pointer ---
@@ -404,13 +403,26 @@ const AbstractPlanNode *Planner::PlanUpdate(const UpdateStatement *stmt) {
     std::string raw_str = ast_const->value_;
     Value val;
 
-    if (expected_type == TypeId::INTEGER)
+    if (raw_str == "NULL") {
+      val = Value::GetNullValue(expected_type);
+    } else if (expected_type == TypeId::INTEGER)
       val = Value(TypeId::INTEGER, std::stoi(raw_str));
+    else if (expected_type == TypeId::BIGINT)
+      val = Value(TypeId::BIGINT, static_cast<int64_t>(std::stoll(raw_str)));
+    else if (expected_type == TypeId::DECIMAL)
+      val = Value(TypeId::DECIMAL, std::stod(raw_str));
+    else if (expected_type == TypeId::BOOLEAN) {
+      bool b = (raw_str == "TRUE" || raw_str == "true" || raw_str == "1");
+      val = Value(TypeId::BOOLEAN, b);
+    } else if (expected_type == TypeId::TIMESTAMP)
+      val = Value(TypeId::BIGINT, static_cast<int64_t>(std::stoll(raw_str)));
     else if (expected_type == TypeId::VARCHAR) {
       if (raw_str.length() >= 2 && raw_str.front() == '\'' &&
           raw_str.back() == '\'') {
         raw_str = raw_str.substr(1, raw_str.length() - 2);
       }
+      val = Value(TypeId::VARCHAR, raw_str);
+    } else {
       val = Value(TypeId::VARCHAR, raw_str);
     }
 
@@ -505,9 +517,17 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
     } else if (raw_str.length() >= 2 && raw_str.front() == '\'' &&
                raw_str.back() == '\'') {
       val = Value(TypeId::VARCHAR, raw_str.substr(1, raw_str.length() - 2));
+    } else if (raw_str == "TRUE" || raw_str == "true" || raw_str == "FALSE" ||
+               raw_str == "false") {
+      bool b = (raw_str == "TRUE" || raw_str == "true");
+      val = Value(TypeId::BOOLEAN, b);
     } else {
       try {
-        val = Value(TypeId::INTEGER, std::stoi(raw_str));
+        if (raw_str.find('.') != std::string::npos) {
+          val = Value(TypeId::DECIMAL, std::stod(raw_str));
+        } else {
+          val = Value(TypeId::INTEGER, std::stoi(raw_str));
+        }
       } catch (...) {
         val = Value(TypeId::VARCHAR, raw_str);
       }

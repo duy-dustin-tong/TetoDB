@@ -448,6 +448,13 @@ std::unique_ptr<Expr> Parser::ParseBaseExpression() {
     return std::make_unique<ConstantExpr>("NULL");
   }
 
+  if (Match(TokenType::KEYWORD, "TRUE")) {
+    return std::make_unique<ConstantExpr>("TRUE");
+  }
+  if (Match(TokenType::KEYWORD, "FALSE")) {
+    return std::make_unique<ConstantExpr>("FALSE");
+  }
+
   if (Match(TokenType::NUMBER)) {
     return std::make_unique<ConstantExpr>(tokens_[cursor_ - 1].value_);
   }
