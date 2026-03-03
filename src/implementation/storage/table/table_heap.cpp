@@ -1,44 +1,132 @@
 // table_heap.cpp
 
-
 #include "storage/table/table_heap.h"
 #include "storage/page/page_guard.h"
+#include "concurrency/transaction.h" 
 
 namespace tetodb {
 
-    // CONSTRUCTOR 1: New Table
-    TableHeap::TableHeap(BufferPoolManager* bpm, Transaction* txn) : bpm_(bpm) {
-        // 1. Allocate First Page
+    TableHeap::TableHeap(BufferPoolManager* bpm, LogManager* log_manager, Transaction* txn)
+        : bpm_(bpm), log_manager_(log_manager)
+    {
         page_id_t first_page_id;
         Page* page = bpm_->NewPage(&first_page_id);
 
-        // 2. Guard it immediately (Auto-Unpin on exit)
-        // Note: NewPage returns a pinned page. The Guard constructor usually expects to just Latch.
-        // However, since we just allocated it, we are the only owner. 
-        // We can just cast and init.
-
-        // RAII approach: Wrap it in a WritePageGuard to ensure it gets unpinned/unlatched correctly.
         WritePageGuard guard(bpm_, page);
         auto table_page = guard.As<TablePage>();
 
         table_page->Init(first_page_id, PAGE_SIZE);
-        guard.MarkDirty(); // Ensure it gets written to disk
+
+        guard.MarkDirty();
 
         first_page_id_ = first_page_id;
+        last_page_id_ = first_page_id;
+        fsm_.Update(first_page_id, table_page->GetFreeSpaceRemaining());
     }
 
-    // CONSTRUCTOR 2: Existing Table
-    TableHeap::TableHeap(BufferPoolManager* bpm, page_id_t first_page_id)
-        : bpm_(bpm), first_page_id_(first_page_id) {
+    TableHeap::TableHeap(BufferPoolManager* bpm, page_id_t first_page_id, LogManager* log_manager)
+        : bpm_(bpm), log_manager_(log_manager), first_page_id_(first_page_id)
+    {
+        page_id_t current_page_id = first_page_id;
+        page_id_t prev_page_id = INVALID_PAGE_ID;
+
+        while (current_page_id != INVALID_PAGE_ID) {
+            Page* page = bpm_->FetchPage(current_page_id);
+            if (page == nullptr) {
+                break;
+            }
+
+            ReadPageGuard guard(bpm_, page);
+            auto table_page = guard.As<TablePage>();
+
+            fsm_.Update(current_page_id, table_page->GetFreeSpaceRemaining());
+
+            prev_page_id = current_page_id;
+            page_id_t next_page_id = table_page->GetNextPageId();
+
+            if (next_page_id == current_page_id) {
+                break;
+            }
+
+            current_page_id = next_page_id;
+        }
+
+        last_page_id_ = prev_page_id;
     }
 
-
-    // INSERT OPERATION
     bool TableHeap::InsertTuple(const Tuple& tuple, RID* rid, Transaction* txn) {
         if (tuple.GetSize() + 32 > PAGE_SIZE) return false;
 
-        // 1. Optimistic: Try the cached Last Page directly
-        Page* page = bpm_->FetchPage(last_page_id_);
+        page_id_t target_page_id = INVALID_PAGE_ID;
+        uint32_t required_space = tuple.GetSize() + SIZE_SLOT;
+
+        {
+            std::lock_guard<std::mutex> lock(latch_);
+            target_page_id = fsm_.GetBestPage(required_space);
+        }
+
+        // FSM confirms no page has space. Allocate a new page.
+        if (target_page_id == INVALID_PAGE_ID) {
+            page_id_t new_page_id;
+            Page* new_page = bpm_->NewPage(&new_page_id);
+            if (new_page == nullptr) return false;
+
+            WritePageGuard new_guard(bpm_, new_page);
+            auto new_table_page = new_guard.As<TablePage>();
+
+            new_table_page->Init(new_page_id, PAGE_SIZE, last_page_id_);
+
+            if (last_page_id_ != INVALID_PAGE_ID) {
+                Page* last_page = bpm_->FetchPage(last_page_id_);
+                if (last_page != nullptr) {
+                    WritePageGuard last_guard(bpm_, last_page);
+                    last_guard.As<TablePage>()->SetNextPageId(new_page_id);
+                    last_guard.MarkDirty();
+                }
+            }
+
+            if (!new_table_page->InsertTuple(tuple, rid)) {
+                return false;
+            }
+
+            new_guard.MarkDirty();
+
+            {
+                std::lock_guard<std::mutex> lock(latch_);
+                last_page_id_ = new_page_id;
+                fsm_.Update(new_page_id, new_table_page->GetFreeSpaceRemaining());
+            }
+
+            if (txn != nullptr) {
+                TableWriteRecord rec;
+                rec.rid_ = *rid;
+                rec.wtype_ = WType::INSERT;
+                rec.table_heap_ = this;
+                txn->AppendTableWriteRecord(rec);
+            }
+
+            if (txn != nullptr && log_manager_ != nullptr) {
+                LogRecord page_log(txn->GetTransactionId(), txn->GetPrevLSN(), LogRecordType::NEWPAGE, last_page_id_, new_page_id);
+                lsn_t page_lsn = log_manager_->AppendLogRecord(&page_log);
+                txn->SetPrevLSN(page_lsn);
+                if (last_page_id_ != INVALID_PAGE_ID) {
+                    Page* last_page = bpm_->FetchPage(last_page_id_);
+                    if (last_page) {
+                        WritePageGuard last_guard(bpm_, last_page);
+                        last_guard.As<TablePage>()->SetLSN(page_lsn);
+                    }
+                }
+
+                LogRecord insert_log(txn->GetTransactionId(), txn->GetPrevLSN(), LogRecordType::INSERT, *rid, tuple);
+                lsn_t insert_lsn = log_manager_->AppendLogRecord(&insert_log);
+                txn->SetPrevLSN(insert_lsn);
+                new_table_page->SetLSN(insert_lsn);
+            }
+            return true;
+        }
+
+        // FSM found a valid page. Use it.
+        Page* page = bpm_->FetchPage(target_page_id);
         if (page == nullptr) return false;
 
         WritePageGuard guard(bpm_, page);
@@ -46,102 +134,182 @@ namespace tetodb {
 
         if (table_page->InsertTuple(tuple, rid)) {
             guard.MarkDirty();
-            return true;
-        }
 
-        // 2. Failure: Last page is full. We need a new page.
-        // (We don't scan previous pages for holes in this design - we just append)
+            {
+                std::lock_guard<std::mutex> lock(latch_);
+                fsm_.Update(target_page_id, table_page->GetFreeSpaceRemaining());
+            }
 
-        page_id_t new_page_id;
-        Page* new_raw_page = bpm_->NewPage(&new_page_id);
-        if (new_raw_page == nullptr) return false;
+            if (txn != nullptr) {
+                TableWriteRecord rec;
+                rec.rid_ = *rid;
+                rec.wtype_ = WType::INSERT;
+                rec.table_heap_ = this;
+                txn->AppendTableWriteRecord(rec);
+            }
 
-        // Link Old -> New
-        table_page->SetNextPageId(new_page_id);
-        guard.MarkDirty();
+            if (txn != nullptr && log_manager_ != nullptr) {
+                LogRecord log_record(txn->GetTransactionId(), txn->GetPrevLSN(), LogRecordType::INSERT, *rid, tuple);
+                lsn_t lsn = log_manager_->AppendLogRecord(&log_record);
+                txn->SetPrevLSN(lsn);
+                table_page->SetLSN(lsn);
+            }
 
-        // Grab the old page ID before we drop the guard
-        page_id_t old_page_id = table_page->GetPageId();
-        guard.Drop(); // Release lock on old last page
-
-        // 3. Setup New Page
-        guard = WritePageGuard(bpm_, new_raw_page);
-        auto new_table_page = guard.As<TablePage>();
-
-        new_table_page->Init(new_page_id, PAGE_SIZE, old_page_id);
-
-        // 4. Update the Cache
-        last_page_id_ = new_page_id; // <--- Critical update
-
-        // 5. Insert into the new page (Guaranteed to succeed since it's empty)
-        new_table_page->InsertTuple(tuple, rid);
-        guard.MarkDirty();
-
-        return true;
-    }
-
-
-    // GET OPERATION
-    bool TableHeap::GetTuple(const RID& rid, Tuple* tuple, Transaction* txn) {
-        Page* page = bpm_->FetchPage(rid.GetPageId());
-        if (page == nullptr) return false;
-
-        // RAII: Automatically RLatch() on construction, RUnlatch()+Unpin() on destruction
-        ReadPageGuard guard(bpm_, page);
-
-        return guard.As<TablePage>()->GetTuple(rid, tuple);
-    }
-
-
-    // DELETE OPERATION
-    bool TableHeap::MarkDelete(const RID& rid, Transaction* txn) {
-        // TO DO: Implement a free_list 
-        // Currently marks slot as deleted and ignore forever
-
-
-
-        Page* page = bpm_->FetchPage(rid.GetPageId());
-        if (page == nullptr) return false;
-
-        // RAII: Automatically WLatch()
-        WritePageGuard guard(bpm_, page);
-
-        if (guard.As<TablePage>()->MarkDelete(rid)) {
-            guard.MarkDirty(); 
             return true;
         }
 
         return false;
     }
 
+    bool TableHeap::GetTuple(const RID& rid, Tuple* tuple, Transaction* txn) {
+        Page* page = bpm_->FetchPage(rid.GetPageId());
+        if (page == nullptr) return false;
 
-    // UPDATE OPERATION
+        ReadPageGuard guard(bpm_, page);
+        return guard.As<TablePage>()->GetTuple(rid, tuple);
+    }
+
+    bool TableHeap::MarkDelete(const RID& rid, Transaction* txn) {
+        Page* page = bpm_->FetchPage(rid.GetPageId());
+        if (page == nullptr) return false;
+
+        WritePageGuard guard(bpm_, page);
+
+        Tuple deleted_tuple;
+        bool has_tuple = guard.As<TablePage>()->GetTuple(rid, &deleted_tuple);
+
+        if (guard.As<TablePage>()->MarkDelete(rid)) {
+            guard.MarkDirty();
+
+            {
+                std::lock_guard<std::mutex> lock(latch_);
+                fsm_.Update(rid.GetPageId(), guard.As<TablePage>()->GetFreeSpaceRemaining());
+            }
+
+            if (txn != nullptr) {
+                TableWriteRecord rec;
+                rec.rid_ = rid;
+                rec.wtype_ = WType::DELETE;
+                rec.tuple_ = deleted_tuple;
+                rec.table_heap_ = this;
+                txn->AppendTableWriteRecord(rec);
+            }
+
+            if (txn != nullptr && log_manager_ != nullptr && has_tuple) {
+                LogRecord log_record(txn->GetTransactionId(), txn->GetPrevLSN(), LogRecordType::MARKDELETE, rid, deleted_tuple);
+                lsn_t lsn = log_manager_->AppendLogRecord(&log_record);
+                txn->SetPrevLSN(lsn);
+                guard.As<TablePage>()->SetLSN(lsn);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     bool TableHeap::UpdateTuple(const Tuple& tuple, RID* rid, Transaction* txn) {
-        // 1. Find the old page
         Page* page = bpm_->FetchPage(rid->GetPageId());
         if (page == nullptr) return false;
 
-        // 2. Delete the old tuple
-        // Scope the guard so it releases the lock immediately after delete
         {
             WritePageGuard guard(bpm_, page);
+
+            Tuple old_tuple;
+            guard.As<TablePage>()->GetTuple(*rid, &old_tuple);
+
             if (!guard.As<TablePage>()->MarkDelete(*rid)) {
                 return false;
             }
             guard.MarkDirty();
-        } // Guard destroys here -> Page Unlatched & Unpinned
 
-        // 3. Insert the new tuple
-        // This starts a fresh search from the beginning of the heap
+            {
+                std::lock_guard<std::mutex> lock(latch_);
+                fsm_.Update(rid->GetPageId(), guard.As<TablePage>()->GetFreeSpaceRemaining());
+            }
+
+            if (txn != nullptr) {
+                TableWriteRecord rec;
+                rec.rid_ = *rid;
+                rec.wtype_ = WType::DELETE;
+                rec.tuple_ = old_tuple;
+                rec.table_heap_ = this;
+                txn->AppendTableWriteRecord(rec);
+            }
+
+            if (txn != nullptr && log_manager_ != nullptr) {
+                LogRecord log_record(txn->GetTransactionId(), txn->GetPrevLSN(), LogRecordType::MARKDELETE, *rid, old_tuple);
+                lsn_t lsn = log_manager_->AppendLogRecord(&log_record);
+                txn->SetPrevLSN(lsn);
+                guard.As<TablePage>()->SetLSN(lsn);
+            }
+        }
+
         RID new_rid;
         if (InsertTuple(tuple, &new_rid, txn)) {
             *rid = new_rid;
             return true;
         }
 
-        // If insert fails (out of space?), technically we should UNDO the delete.
-        // But without transactions/logging, we can't easily undo yet.
         return false;
+    }
+
+    bool TableHeap::RollbackDelete(const RID& rid, const Tuple& tuple, Transaction* txn) {
+        Page* page = bpm_->FetchPage(rid.GetPageId());
+        if (page == nullptr) return false;
+
+        WritePageGuard guard(bpm_, page);
+        auto table_page = guard.As<TablePage>();
+
+        if (table_page->RollbackDelete(rid, tuple)) {
+            guard.MarkDirty();
+
+            {
+                std::lock_guard<std::mutex> lock(latch_);
+                fsm_.Update(rid.GetPageId(), table_page->GetFreeSpaceRemaining());
+            }
+
+            if (txn != nullptr && log_manager_ != nullptr) {
+                LogRecord log_record(txn->GetTransactionId(), txn->GetPrevLSN(), LogRecordType::ROLLBACKDELETE, rid, tuple);
+                lsn_t lsn = log_manager_->AppendLogRecord(&log_record);
+                txn->SetPrevLSN(lsn);
+                table_page->SetLSN(lsn);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    void TableHeap::Destroy() {
+        page_id_t current_page_id = first_page_id_;
+
+        while (current_page_id != INVALID_PAGE_ID) {
+            page_id_t next_page_id;
+
+            {
+                Page* page = bpm_->FetchPage(current_page_id);
+                if (page == nullptr) {
+                    break;
+                }
+
+                ReadPageGuard guard(bpm_, page);
+                next_page_id = guard.As<TablePage>()->GetNextPageId();
+            }
+
+            bpm_->DeletePage(current_page_id);
+
+            if (current_page_id == next_page_id) break;
+
+            current_page_id = next_page_id;
+        }
+
+        first_page_id_ = INVALID_PAGE_ID;
+        last_page_id_ = INVALID_PAGE_ID;
+
+        std::lock_guard<std::mutex> lock(latch_);
+        fsm_.Clear();
     }
 
 } // namespace tetodb

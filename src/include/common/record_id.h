@@ -47,3 +47,16 @@ namespace tetodb {
     };
 
 } // namespace tetodb
+
+
+namespace std {
+    template <>
+    struct hash<tetodb::RID> {
+        size_t operator()(const tetodb::RID& rid) const {
+            // Combine the hashes of Page ID and Slot Num
+            size_t h1 = std::hash<tetodb::page_id_t>()(rid.GetPageId());
+            size_t h2 = std::hash<uint32_t>()(rid.GetSlotId());
+            return h1 ^ (h2 << 1); // Bitwise XOR to combine them
+        }
+    };
+}

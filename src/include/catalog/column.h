@@ -93,6 +93,9 @@ namespace tetodb {
         // CHAR is Inlined. VARCHAR is NOT Inlined (stored in Heap).
         inline bool IsInlined() const { return type_id_ != TypeId::VARCHAR; }
 
+        inline bool IsNullable() const { return is_nullable_; }
+        inline void SetNullable(bool nullable) { is_nullable_ = nullable; }
+
         std::string ToString() const {
             return name_ + ":" + std::to_string(static_cast<int>(type_id_));
         }
@@ -100,7 +103,7 @@ namespace tetodb {
     private:
         std::string name_;
         TypeId type_id_;
-
+        bool is_nullable_{ false };
         // The size this column takes up in the main tuple layout.
         uint32_t fixed_length_{ 0 };
 

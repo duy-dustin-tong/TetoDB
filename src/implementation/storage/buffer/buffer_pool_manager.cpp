@@ -3,219 +3,200 @@
 #include "storage/buffer/buffer_pool_manager.h"
 
 namespace tetodb {
-	BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager* disk_manager, TwoQueueReplacer* replacer) 
-		: pool_size_(pool_size), disk_manager_(disk_manager), replacer_(replacer)
-	{
-		size_t bytes = pool_size_ * PAGE_SIZE;
-		char* raw_ptr = nullptr;
+    BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager* disk_manager, TwoQueueReplacer* replacer)
+        : pool_size_(pool_size), disk_manager_(disk_manager), replacer_(replacer)
+    {
+        size_t bytes = pool_size_ * PAGE_SIZE;
+        char* raw_ptr = nullptr;
 
-		#ifdef _WIN32
-			// Windows: _aligned_malloc(size, alignment)
-			raw_ptr = static_cast<char*>(_aligned_malloc(bytes, PAGE_SIZE));
-			if (!raw_ptr) throw std::bad_alloc();
-		#else
-			// Linux/Mac: posix_memalign
-			if (posix_memalign((void**)&raw_ptr, PAGE_SIZE, bytes) != 0) {
-				throw std::bad_alloc();
-			}
-		#endif
+#ifdef _WIN32
+        raw_ptr = static_cast<char*>(_aligned_malloc(bytes, PAGE_SIZE));
+        if (!raw_ptr) throw std::bad_alloc();
+#else
+        if (posix_memalign((void**)&raw_ptr, PAGE_SIZE, bytes) != 0) {
+            throw std::bad_alloc();
+        }
+#endif
 
-		data_pool_.reset(raw_ptr);
-		pages_.resize(pool_size_);
+        data_pool_.reset(raw_ptr);
+        pages_.resize(pool_size_);
 
-		for (size_t i = 0; i < pool_size_; i++) {
-			pages_[i].data_ = data_pool_.get() + (i * PAGE_SIZE);
-			free_list_.push_back(static_cast<frame_id_t>(i));
-		}
-	}
+        for (size_t i = 0; i < pool_size_; i++) {
+            pages_[i].data_ = data_pool_.get() + (i * PAGE_SIZE);
+            free_list_.push_back(static_cast<frame_id_t>(i));
+        }
+    }
 
-	BufferPoolManager::~BufferPoolManager() = default;
+    BufferPoolManager::~BufferPoolManager() = default;
 
+    bool BufferPoolManager::GetFreeFrame(frame_id_t* frame_id) {
+        if (!free_list_.empty()) {
+            *frame_id = free_list_.front();
+            free_list_.pop_front();
+            return true;
+        }
 
+        if (replacer_->Evict(frame_id)) {
+            Page* evicted_page = &pages_[*frame_id];
 
-	bool BufferPoolManager::GetFreeFrame(frame_id_t* frame_id) {
-		if (!free_list_.empty()) {
-			*frame_id = free_list_.front();
-			free_list_.pop_front();
-			return true;
-		}
+            if (evicted_page->is_dirty_) {
+                disk_manager_->WritePage(evicted_page->GetPageId(), evicted_page->GetData());
+                evicted_page->is_dirty_ = false;
+            }
 
-		if (replacer_->Evict(frame_id)) {
-			Page* evicted_page = &pages_[*frame_id];
+            page_table_.erase(evicted_page->GetPageId());
+            return true;
+        }
 
-			if (evicted_page->is_dirty_) {
-				disk_manager_->WritePage(evicted_page->GetPageId(), evicted_page->GetData());
-			}
+        return false;
+    }
 
-			page_table_.erase(evicted_page->GetPageId());
-			return true;
-		}
+    Page* BufferPoolManager::NewPage(page_id_t* page_id) {
+        std::scoped_lock<std::mutex> lock(latch_);
 
+        frame_id_t frame_id = INVALID_FRAME_ID;
 
-		return false;
-	}
+        if (!GetFreeFrame(&frame_id)) {
+            return nullptr;
+        }
 
+        *page_id = disk_manager_->AllocatePage();
 
+        Page* page = &pages_[frame_id];
 
-	Page* BufferPoolManager::NewPage(page_id_t* page_id) {
+        page->page_id_ = *page_id;
+        page->pin_count_ = 1;
+        page->is_dirty_ = true;
+        page->ResetMemory();
 
-		std::scoped_lock<std::mutex> lock(latch_);
+        page_table_[*page_id] = frame_id;
+        replacer_->RecordAccess(frame_id);
+        replacer_->SetEvictable(frame_id, false);
 
-		frame_id_t frame_id = INVALID_FRAME_ID;
-		
-		if (!GetFreeFrame(&frame_id)) {
-			return nullptr;
-		}
-		
-		
-		*page_id = disk_manager_->AllocatePage();
+        return page;
+    }
 
+    Page* BufferPoolManager::FetchPage(page_id_t page_id) {
+        std::scoped_lock<std::mutex> lock(latch_);
 
-		// set up page
-		Page* page = &pages_[frame_id];
+        // FIX: Removed '&' to prevent dangling reference
+        auto it = page_table_.find(page_id);
+        if (it != page_table_.end()) {
+            frame_id_t frame_id = it->second;
+            Page* page = &pages_[frame_id];
 
-		page->page_id_ = *page_id;
-		page->pin_count_ = 1;
-		page->is_dirty_ = true;
-		page->ResetMemory();
+            page->pin_count_++;
 
-		page_table_[*page_id] = frame_id;
-		replacer_->RecordAccess(frame_id);
-		replacer_->SetEvictable(frame_id, false);
+            replacer_->RecordAccess(frame_id);
+            replacer_->SetEvictable(frame_id, false);
 
-		return page;
-	}
+            return page;
+        }
 
-	Page* BufferPoolManager::FetchPage(page_id_t page_id) { 
-		std::scoped_lock<std::mutex> lock(latch_);
+        frame_id_t frame_id = INVALID_FRAME_ID;
 
-		auto& it = page_table_.find(page_id);
-		if (it != page_table_.end()) {
-			frame_id_t frame_id = it->second;
-			Page* page = &pages_[frame_id];
+        if (!GetFreeFrame(&frame_id)) {
+            return nullptr;
+        }
 
-			page->pin_count_++;
+        Page* page = &pages_[frame_id];
+        disk_manager_->ReadPage(page_id, page->GetData());
 
-			replacer_->RecordAccess(frame_id);
-			replacer_->SetEvictable(frame_id, false);
+        page->page_id_ = page_id;
+        page->pin_count_ = 1;
+        page->is_dirty_ = false;
 
-			return page;
-		}
+        page_table_[page_id] = frame_id;
+        replacer_->RecordAccess(frame_id);
+        replacer_->SetEvictable(frame_id, false);
 
-		frame_id_t frame_id = INVALID_FRAME_ID;
+        return page;
+    }
 
-		if (!GetFreeFrame(&frame_id)) {
-			return nullptr;
-		}
-		
-		
-		Page* page = &pages_[frame_id];
-		disk_manager_->ReadPage(page_id, page->GetData());
+    bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
+        std::scoped_lock<std::mutex> lock(latch_);
 
-		page->page_id_ = page_id;
-		page->pin_count_ = 1;
-		page->is_dirty_ = false; 
+        // FIX: Removed '&' to prevent dangling reference
+        auto it = page_table_.find(page_id);
+        if (it == page_table_.end()) {
+            return false;
+        }
 
-		
-		page_table_[page_id] = frame_id;
-		replacer_->RecordAccess(frame_id);
-		replacer_->SetEvictable(frame_id, false);
+        frame_id_t frame_id = it->second;
+        Page* page = &pages_[frame_id];
 
-		return page;
-	}
+        if (page->pin_count_ <= 0) return false;
 
+        page->pin_count_--;
+        page->is_dirty_ |= is_dirty;
 
-	bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) { 
-		std::scoped_lock<std::mutex> lock(latch_);
+        if (page->pin_count_ == 0) {
+            replacer_->SetEvictable(frame_id, true);
+        }
 
-		auto& it = page_table_.find(page_id);
-		if (it == page_table_.end()) {
-			return false;
-		}
+        return true;
+    }
 
-		frame_id_t frame_id = it->second;
+    bool BufferPoolManager::DeletePage(page_id_t page_id) {
+        std::scoped_lock<std::mutex> lock(latch_);
 
-		Page* page = &pages_[frame_id];
+        // FIX: Removed '&' to prevent dangling reference
+        auto it = page_table_.find(page_id);
+        if (it == page_table_.end()) {
+            disk_manager_->DeallocatePage(page_id);
+            return true;
+        }
 
-		if (page->pin_count_ <= 0) return false;
+        frame_id_t frame_id = it->second;
+        Page* page = &pages_[frame_id];
 
-		page->pin_count_--;
+        if (page->pin_count_ > 0) {
+            return false;
+        }
 
-		if (is_dirty) page->is_dirty_ = true;
+        page->page_id_ = INVALID_PAGE_ID;
+        page->is_dirty_ = false;
+        page->pin_count_ = 0;
+        page->ResetMemory();
 
-		if (page->pin_count_ == 0) {
-			replacer_->SetEvictable(frame_id, true);
-		}
+        page_table_.erase(page_id);
+        replacer_->Remove(frame_id);
 
-		return true; 
-	
-	}
+        free_list_.push_back(frame_id);
 
-	bool BufferPoolManager::DeletePage(page_id_t page_id) {
-		std::scoped_lock<std::mutex> lock(latch_);
+        disk_manager_->DeallocatePage(page_id);
+        return true;
+    }
 
-		auto& it = page_table_.find(page_id);
-		if (it == page_table_.end()) {
-			disk_manager_->DeallocatePage(page_id);
-			return true;
-		}
+    bool BufferPoolManager::FlushPage(page_id_t page_id) {
+        std::scoped_lock<std::mutex> lock(latch_);
 
-		frame_id_t frame_id = it->second;
-		Page* page = &pages_[frame_id];
+        // FIX: Removed '&' to prevent dangling reference
+        auto it = page_table_.find(page_id);
+        if (it == page_table_.end()) {
+            return false;
+        }
 
-		if (page->pin_count_ > 0) {
-			return false;
-		}
+        frame_id_t frame_id = it->second;
+        Page* page = &pages_[frame_id];
 
-		page->page_id_ = INVALID_PAGE_ID;
-		page->is_dirty_ = false;
-		page->pin_count_ = 0;
-		page->ResetMemory();
-		
-		page_table_.erase(page_id);
-		replacer_->Remove(frame_id);
+        disk_manager_->WritePage(page_id, page->GetData());
+        page->is_dirty_ = false;
 
-		free_list_.push_back(frame_id);
+        return true;
+    }
 
-		disk_manager_->DeallocatePage(page_id);
-		return true;
-	}
+    void BufferPoolManager::FlushAllPages() {
+        std::scoped_lock<std::mutex> lock(latch_);
 
-	bool BufferPoolManager::FlushPage(page_id_t page_id) { 
-		std::scoped_lock<std::mutex> lock(latch_);
+        for (size_t i = 0; i < pool_size_; i++) {
+            Page* page = &pages_[i];
 
-		auto& it = page_table_.find(page_id);
-		if (it == page_table_.end()) {
-			return false;
-		}
-
-		frame_id_t frame_id = it->second;
-
-		Page* page = &pages_[frame_id];
-
-		disk_manager_->WritePage(page_id, page->GetData());
-		page->is_dirty_ = false;
-
-
-		return true; 
-	}
-
-	void BufferPoolManager::FlushAllPages() {
-		std::scoped_lock<std::mutex> lock(latch_);
-
-		for (size_t i = 0; i < pool_size_; i++) {
-			Page* page = &pages_[i];
-			if (page->page_id_ != INVALID_PAGE_ID && page->is_dirty_) {
-				disk_manager_->WritePage(page->page_id_, page->GetData());
-				page->is_dirty_ = false;
-			}
-		}
-	}
-
-	
-	
-	
-	
+            if (page->page_id_ != INVALID_PAGE_ID && page->is_dirty_) {
+                disk_manager_->WritePage(page->page_id_, page->GetData());
+                page->is_dirty_ = false;
+            }
+        }
+    }
 
 } // namespace tetodb
-

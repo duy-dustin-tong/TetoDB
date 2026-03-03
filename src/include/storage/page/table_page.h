@@ -10,40 +10,31 @@
 
 namespace tetodb {
 
-    /**
-     * SLOTTED PAGE HEADER LAYOUT 
-     * --------------------------------------
-     * | Offset | Size | Name               |
-     * |--------|------|--------------------|
-     * | 0      | 4    | PageId             |
-     * | 4      | 4    | LSN                |
-     * | 8      | 4    | PrevPageId         |
-     * | 12     | 4    | NextPageId         |
-     * | 16     | 4    | FreeSpacePointer   |
-     * | 20     | 4    | SlotCount          |
-     * --------------------------------------
-     * Total Header Size: 24 Bytes
-     */
-
     static constexpr size_t OFFSET_PAGE_ID = 0;
-    static constexpr size_t OFFSET_LSN = 4;           
-    static constexpr size_t OFFSET_PREV_PAGE_ID = 8;  
-    static constexpr size_t OFFSET_NEXT_PAGE_ID = 12; 
-    static constexpr size_t OFFSET_FREE_SPACE = 16;   
-    static constexpr size_t OFFSET_SLOT_COUNT = 20;   
+    static constexpr size_t OFFSET_LSN = 4;
+    static constexpr size_t OFFSET_PREV_PAGE_ID = 8;
+    static constexpr size_t OFFSET_NEXT_PAGE_ID = 12;
+    static constexpr size_t OFFSET_FREE_SPACE = 16;
+    static constexpr size_t OFFSET_SLOT_COUNT = 20;
     static constexpr size_t SIZE_TABLE_PAGE_HEADER = 24;
     static constexpr size_t SIZE_SLOT = 8;
+
+    // Bitmask to flag a tuple as logically deleted without destroying its size metadata
+    static constexpr uint32_t DELETE_MASK = 0x80000000;
 
     class TablePage : public Page {
     public:
         void Init(page_id_t page_id, uint32_t page_size = PAGE_SIZE, page_id_t prev_page_id = INVALID_PAGE_ID, lsn_t lsn = INVALID_LSN);
 
-        
         bool InsertTuple(const Tuple& tuple, RID* rid);
+        bool ForceInsertTuple(const Tuple& tuple, const RID& rid);
         bool MarkDelete(const RID& rid);
+        bool ApplyDelete(const RID& rid);
         bool GetTuple(const RID& rid, Tuple* tuple);
+        bool RollbackDelete(const RID& rid, const Tuple& tuple);
 
-        
+        // Physically defragments the page to reclaim dead space
+        void Compact();
 
         inline page_id_t GetPageId() {
             return *reinterpret_cast<page_id_t*>(GetData() + OFFSET_PAGE_ID);
@@ -85,6 +76,15 @@ namespace tetodb {
         }
         inline void SetSlotCount(uint32_t count) {
             *reinterpret_cast<uint32_t*>(GetData() + OFFSET_SLOT_COUNT) = count;
+        }
+
+        inline bool IsValidTuple(uint32_t slot_idx) {
+            if (slot_idx >= GetSlotCount()) return false;
+            size_t slot_offset = SIZE_TABLE_PAGE_HEADER + (slot_idx * SIZE_SLOT);
+            uint32_t tuple_size = *reinterpret_cast<uint32_t*>(GetData() + slot_offset + 4);
+
+            // Valid if size > 0 AND the delete mask is not set
+            return tuple_size > 0 && (tuple_size & DELETE_MASK) == 0;
         }
 
         uint32_t GetFreeSpaceRemaining();

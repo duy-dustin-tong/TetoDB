@@ -45,18 +45,17 @@ namespace tetodb {
     void TwoQueueReplacer::RecordAccess(frame_id_t frame_id) {
         std::scoped_lock<std::mutex> lock(latch_);
 
-        auto& it = node_store_.find(frame_id);
+        // FIX: Removed '&' to prevent dangling reference
+        auto it = node_store_.find(frame_id);
+
         if (it == node_store_.end()) {
-            // brand new page -> goes to FIFO
             fifo_.push_front(frame_id);
             node_store_[frame_id] = { frame_id, false, StoreType::FIFO, fifo_.begin() };
         }
         else {
-            // page already exists, check where it is
             QueueNode& node = it->second;
 
             if (node.type_ == StoreType::FIFO) {
-                // 2nd access, move to LRU
                 fifo_.erase(node.iter_);
 
                 lru_.push_front(frame_id);
@@ -64,7 +63,6 @@ namespace tetodb {
                 node.iter_ = lru_.begin();
             }
             else {
-                // already in LRU, move to front
                 lru_.erase(node.iter_);
 
                 lru_.push_front(frame_id);
@@ -76,7 +74,8 @@ namespace tetodb {
     void TwoQueueReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
         std::scoped_lock<std::mutex> lock(latch_);
 
-        auto& it = node_store_.find(frame_id);
+        // FIX: Removed '&' to prevent dangling reference
+        auto it = node_store_.find(frame_id);
         if (it == node_store_.end()) return;
 
         QueueNode& node = it->second;
@@ -95,7 +94,8 @@ namespace tetodb {
     void TwoQueueReplacer::Remove(frame_id_t frame_id) {
         std::scoped_lock<std::mutex> lock(latch_);
 
-        auto& it = node_store_.find(frame_id);
+        // FIX: Removed '&' to prevent dangling reference
+        auto it = node_store_.find(frame_id);
         if (it == node_store_.end()) return;
 
         QueueNode& node = it->second;

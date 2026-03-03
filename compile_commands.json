@@ -1,0 +1,290 @@
+[
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\buffer\\buffer_pool_manager.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\storage\\buffer\\buffer_pool_manager.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\storage\\buffer\\buffer_pool_manager.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\buffer\\buffer_pool_manager.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\disk\\disk_manager.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\storage\\disk\\disk_manager.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\storage\\disk\\disk_manager.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\disk\\disk_manager.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\buffer\\two_queue_replacer.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\storage\\buffer\\two_queue_replacer.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\storage\\buffer\\two_queue_replacer.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\buffer\\two_queue_replacer.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\page\\table_page.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\storage\\page\\table_page.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\storage\\page\\table_page.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\page\\table_page.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\table\\table_heap.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\storage\\table\\table_heap.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\storage\\table\\table_heap.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\table\\table_heap.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\type\\value.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\type\\value.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\type\\value.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\type\\value.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\table\\tuple.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\storage\\table\\tuple.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\storage\\table\\tuple.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\table\\tuple.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\type\\type.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\type\\type.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\type\\type.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\type\\type.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\catalog\\catalog.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\catalog\\catalog.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\catalog\\catalog.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\catalog\\catalog.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\seq_scan_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\seq_scan_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\seq_scan_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\seq_scan_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\table\\table_iterator.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\storage\\table\\table_iterator.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\storage\\table\\table_iterator.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\table\\table_iterator.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\insert_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\insert_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\insert_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\insert_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\page\\b_plus_tree_leaf_page.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\storage\\page\\b_plus_tree_leaf_page.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\storage\\page\\b_plus_tree_leaf_page.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\page\\b_plus_tree_leaf_page.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\page\\b_plus_tree_internal_page.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\storage\\page\\b_plus_tree_internal_page.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\storage\\page\\b_plus_tree_internal_page.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\storage\\page\\b_plus_tree_internal_page.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\index\\b_plus_tree.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\index\\b_plus_tree.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\index\\b_plus_tree.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\index\\b_plus_tree.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\index_scan_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\index_scan_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\index_scan_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\index_scan_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\concurrency\\lock_manager.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\concurrency\\lock_manager.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\concurrency\\lock_manager.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\concurrency\\lock_manager.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\concurrency\\transaction_manager.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\concurrency\\transaction_manager.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\concurrency\\transaction_manager.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\concurrency\\transaction_manager.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\delete_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\delete_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\delete_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\delete_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\update_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\update_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\update_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\update_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\recovery\\log_record.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\recovery\\log_record.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\recovery\\log_record.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\recovery\\log_record.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\recovery\\log_manager.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\recovery\\log_manager.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\recovery\\log_manager.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\recovery\\log_manager.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\recovery\\recovery_manager.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\recovery\\recovery_manager.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\recovery\\recovery_manager.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\recovery\\recovery_manager.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\nested_loop_join_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\nested_loop_join_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\nested_loop_join_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\nested_loop_join_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\projection_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\projection_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\projection_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\projection_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\aggregation_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\aggregation_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\aggregation_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\aggregation_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\hash_join_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\hash_join_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\hash_join_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\hash_join_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\parser\\lexer.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\parser\\lexer.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\parser\\lexer.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\parser\\lexer.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\parser\\parser.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\parser\\parser.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\parser\\parser.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\parser\\parser.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\planner\\planner.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\planner\\planner.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\planner\\planner.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\planner\\planner.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\optimizer\\optimizer.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\optimizer\\optimizer.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\optimizer\\optimizer.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\optimizer\\optimizer.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\execution_engine.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\execution_engine.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\execution_engine.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\execution_engine.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\filter_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\filter_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\filter_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\filter_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\sort_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\sort_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\sort_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\sort_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\limit_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\limit_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\limit_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\limit_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\recovery\\checkpoint_manager.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\recovery\\checkpoint_manager.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\recovery\\checkpoint_manager.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\recovery\\checkpoint_manager.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\topn_executor.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\topn_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\topn_executor.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\execution\\executors\\topn_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\server\\tetodb_instance.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\server\\tetodb_instance.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\server\\tetodb_instance.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\server\\tetodb_instance.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\tetodb_lib.dir\\src\\implementation\\server\\tcp_server.cpp.obj /FdCMakeFiles\\tetodb_lib.dir\\tetodb_lib.pdb /FS -c D:\\TetoDB\\src\\implementation\\server\\tcp_server.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\server\\tcp_server.cpp",
+  "output": "CMakeFiles\\tetodb_lib.dir\\src\\implementation\\server\\tcp_server.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\teto_main.dir\\src\\server_main.cpp.obj /FdCMakeFiles\\teto_main.dir\\ /FS -c D:\\TetoDB\\src\\server_main.cpp",
+  "file": "D:\\TetoDB\\src\\server_main.cpp",
+  "output": "CMakeFiles\\teto_main.dir\\src\\server_main.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\teto_main.dir\\src\\implementation\\execution\\executors\\filter_executor.cpp.obj /FdCMakeFiles\\teto_main.dir\\ /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\filter_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\filter_executor.cpp",
+  "output": "CMakeFiles\\teto_main.dir\\src\\implementation\\execution\\executors\\filter_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\teto_main.dir\\src\\implementation\\execution\\executors\\sort_executor.cpp.obj /FdCMakeFiles\\teto_main.dir\\ /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\sort_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\sort_executor.cpp",
+  "output": "CMakeFiles\\teto_main.dir\\src\\implementation\\execution\\executors\\sort_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\teto_main.dir\\src\\implementation\\execution\\executors\\limit_executor.cpp.obj /FdCMakeFiles\\teto_main.dir\\ /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\limit_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\limit_executor.cpp",
+  "output": "CMakeFiles\\teto_main.dir\\src\\implementation\\execution\\executors\\limit_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\teto_main.dir\\src\\implementation\\recovery\\checkpoint_manager.cpp.obj /FdCMakeFiles\\teto_main.dir\\ /FS -c D:\\TetoDB\\src\\implementation\\recovery\\checkpoint_manager.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\recovery\\checkpoint_manager.cpp",
+  "output": "CMakeFiles\\teto_main.dir\\src\\implementation\\recovery\\checkpoint_manager.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\teto_main.dir\\src\\implementation\\execution\\executors\\topn_executor.cpp.obj /FdCMakeFiles\\teto_main.dir\\ /FS -c D:\\TetoDB\\src\\implementation\\execution\\executors\\topn_executor.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\execution\\executors\\topn_executor.cpp",
+  "output": "CMakeFiles\\teto_main.dir\\src\\implementation\\execution\\executors\\topn_executor.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\teto_main.dir\\src\\implementation\\server\\tetodb_instance.cpp.obj /FdCMakeFiles\\teto_main.dir\\ /FS -c D:\\TetoDB\\src\\implementation\\server\\tetodb_instance.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\server\\tetodb_instance.cpp",
+  "output": "CMakeFiles\\teto_main.dir\\src\\implementation\\server\\tetodb_instance.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\teto_main.dir\\src\\implementation\\server\\tcp_server.cpp.obj /FdCMakeFiles\\teto_main.dir\\ /FS -c D:\\TetoDB\\src\\implementation\\server\\tcp_server.cpp",
+  "file": "D:\\TetoDB\\src\\implementation\\server\\tcp_server.cpp",
+  "output": "CMakeFiles\\teto_main.dir\\src\\implementation\\server\\tcp_server.cpp.obj"
+},
+{
+  "directory": "D:/TetoDB/out/build/x64-Debug",
+  "command": "\"D:\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe\"  /nologo /TP -ID:\\TetoDB\\src\\include /DWIN32 /D_WINDOWS /W3 /GR /EHsc /MDd /Zi /Ob0 /Od /RTC1 -std:c++17 /FoCMakeFiles\\teto_client.dir\\src\\client_main.cpp.obj /FdCMakeFiles\\teto_client.dir\\ /FS -c D:\\TetoDB\\src\\client_main.cpp",
+  "file": "D:\\TetoDB\\src\\client_main.cpp",
+  "output": "CMakeFiles\\teto_client.dir\\src\\client_main.cpp.obj"
+}
+]

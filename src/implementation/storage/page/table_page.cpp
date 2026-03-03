@@ -6,7 +6,7 @@ namespace tetodb {
 
     void TablePage::Init(page_id_t page_id, uint32_t page_size, page_id_t prev_page_id, lsn_t lsn) {
         SetPageId(page_id);
-        SetLSN(lsn); 
+        SetLSN(lsn);
         SetPrevPageId(prev_page_id);
         SetNextPageId(INVALID_PAGE_ID);
 
@@ -14,74 +14,159 @@ namespace tetodb {
         SetSlotCount(0);
     }
 
-    bool TablePage::InsertTuple(const Tuple& tuple, RID* rid) {
-        uint32_t tuple_size = tuple.GetSize();
+    void TablePage::Compact() {
+        char temp_page[PAGE_SIZE];
+        memcpy(temp_page, GetData(), SIZE_TABLE_PAGE_HEADER);
 
-        if (GetFreeSpaceRemaining() < tuple_size + SIZE_SLOT) {
-            return false;
+        uint32_t slot_count = GetSlotCount();
+        memcpy(temp_page + SIZE_TABLE_PAGE_HEADER, GetData() + SIZE_TABLE_PAGE_HEADER, slot_count * SIZE_SLOT);
+
+        uint32_t new_free_ptr = PAGE_SIZE;
+
+        for (uint32_t i = 0; i < slot_count; ++i) {
+            uint32_t slot_offset = SIZE_TABLE_PAGE_HEADER + (i * SIZE_SLOT);
+            uint32_t offset = *reinterpret_cast<uint32_t*>(temp_page + slot_offset);
+            uint32_t size_field = *reinterpret_cast<uint32_t*>(temp_page + slot_offset + 4);
+
+            // If offset > 0 and size_field > 0, the tuple has physical bytes we must preserve
+            if (offset > 0 && size_field > 0) {
+                // Strip the delete mask to get the actual physical size
+                uint32_t actual_size = size_field & ~DELETE_MASK;
+                new_free_ptr -= actual_size;
+
+                memcpy(temp_page + new_free_ptr, GetData() + offset, actual_size);
+
+                // Update the slot to point to the new compacted offset
+                *reinterpret_cast<uint32_t*>(temp_page + slot_offset) = new_free_ptr;
+            }
         }
 
-        uint32_t free_ptr = GetFreeSpacePointer();
-        uint32_t slot_count = GetSlotCount();
+        *reinterpret_cast<uint32_t*>(temp_page + OFFSET_FREE_SPACE) = new_free_ptr;
+        memcpy(GetData(), temp_page, PAGE_SIZE);
+    }
 
+    bool TablePage::InsertTuple(const Tuple& tuple, RID* rid) {
+        uint32_t tuple_size = tuple.GetSize();
+        uint32_t slot_count = GetSlotCount();
+        uint32_t target_slot = 0xFFFFFFFF; // Invalid slot sentinel
+
+        // 1. Slot Reuse: Scan for a fully dead slot (offset == 0 && size == 0)
+        for (uint32_t i = 0; i < slot_count; ++i) {
+            uint32_t slot_offset = SIZE_TABLE_PAGE_HEADER + (i * SIZE_SLOT);
+            uint32_t offset = *reinterpret_cast<uint32_t*>(GetData() + slot_offset);
+            uint32_t size = *reinterpret_cast<uint32_t*>(GetData() + slot_offset + 4);
+            if (offset == 0 && size == 0) {
+                target_slot = i;
+                break;
+            }
+        }
+
+        bool requires_new_slot = (target_slot == 0xFFFFFFFF);
+        uint32_t required_space = tuple_size + (requires_new_slot ? SIZE_SLOT : 0);
+
+        // 2. Compaction Check
+        if (GetFreeSpaceRemaining() < required_space) {
+            Compact();
+            // Verify if compaction actually freed enough contiguous space
+            if (GetFreeSpaceRemaining() < required_space) {
+                return false;
+            }
+        }
+
+        // 3. Allocate Data
+        uint32_t free_ptr = GetFreeSpacePointer();
         uint32_t new_free_ptr = free_ptr - tuple_size;
         memcpy(GetData() + new_free_ptr, tuple.GetData(), tuple_size);
 
-        SetSlot(slot_count, new_free_ptr, tuple_size);
+        // 4. Update Metadata
+        if (requires_new_slot) {
+            target_slot = slot_count;
+            SetSlotCount(slot_count + 1);
+        }
 
-        // 5. Update Header
+        SetSlot(target_slot, new_free_ptr, tuple_size);
         SetFreeSpacePointer(new_free_ptr);
-        SetSlotCount(slot_count + 1);
 
-        // 6. Return the new RID
-        rid->Set(GetPageId(), slot_count);
+        rid->Set(GetPageId(), target_slot);
+        return true;
+    }
+
+    bool TablePage::ForceInsertTuple(const Tuple& tuple, const RID& rid) {
+        uint32_t slot_id = rid.GetSlotId();
+        uint32_t tuple_size = tuple.GetSize();
+
+        if (slot_id >= GetSlotCount()) {
+            SetSlotCount(slot_id + 1);
+        }
+
+        if (GetFreeSpaceRemaining() < tuple_size) {
+            Compact();
+        }
+
+        uint32_t free_space_ptr = GetFreeSpacePointer();
+        free_space_ptr -= tuple_size;
+        SetFreeSpacePointer(free_space_ptr);
+
+        tuple.SerializeTo(GetData() + free_space_ptr);
+        SetSlot(slot_id, free_space_ptr, tuple_size);
+
         return true;
     }
 
     bool TablePage::MarkDelete(const RID& rid) {
         uint32_t slot_idx = rid.GetSlotId();
+        if (slot_idx >= GetSlotCount()) return false;
 
-        // Bounds check
-        if (slot_idx >= GetSlotCount()) {
-            return false;
-        }
-
-        // To delete, we set the Tuple Length to 0 (Tombstone).
-        // Slot Format: [Offset (4B)] [Length (4B)]
         uint32_t slot_offset = SIZE_TABLE_PAGE_HEADER + (slot_idx * SIZE_SLOT);
+        uint32_t tuple_size = *reinterpret_cast<uint32_t*>(GetData() + slot_offset + 4);
 
-        // Zero out the length field (offset + 4)
-        uint32_t zero = 0;
-        memcpy(GetData() + slot_offset + 4, &zero, 4);
+        // Flip the highest bit to mark as deleted without destroying the size integer
+        tuple_size |= DELETE_MASK;
+        *reinterpret_cast<uint32_t*>(GetData() + slot_offset + 4) = tuple_size;
 
+        return true;
+    }
+
+    bool TablePage::ApplyDelete(const RID& rid) {
+        uint32_t slot_id = rid.GetSlotId();
+        if (slot_id >= GetSlotCount()) return false;
+
+        // Fully erase offset and size. This explicitly triggers slot reuse.
+        SetSlot(slot_id, 0, 0);
         return true;
     }
 
     bool TablePage::GetTuple(const RID& rid, Tuple* tuple) {
         uint32_t slot_idx = rid.GetSlotId();
+        if (slot_idx >= GetSlotCount()) return false;
 
-        // Bounds check
-        if (slot_idx >= GetSlotCount()) {
-            return false;
-        }
-
-        // Read Slot Info
         uint32_t slot_offset = SIZE_TABLE_PAGE_HEADER + (slot_idx * SIZE_SLOT);
         uint32_t tuple_offset = *reinterpret_cast<uint32_t*>(GetData() + slot_offset);
         uint32_t tuple_size = *reinterpret_cast<uint32_t*>(GetData() + slot_offset + 4);
 
-        // Check if deleted (Tombstone)
-        if (tuple_size == 0) {
+        if (tuple_size == 0 || (tuple_size & DELETE_MASK)) {
             return false;
         }
 
-        // Read the actual data from the offset
         tuple->DeserializeFrom(GetData() + tuple_offset, tuple_size);
         tuple->SetRid(rid);
+        return true;
+    }
+
+    bool TablePage::RollbackDelete(const RID& rid, const Tuple& tuple) {
+        uint32_t slot_idx = rid.GetSlotId();
+        if (slot_idx >= GetSlotCount()) return false;
+
+        uint32_t slot_offset = SIZE_TABLE_PAGE_HEADER + (slot_idx * SIZE_SLOT);
+        uint32_t tuple_size = *reinterpret_cast<uint32_t*>(GetData() + slot_offset + 4);
+
+        // Strip the delete mask to restore the tuple to valid status
+        tuple_size &= ~DELETE_MASK;
+        *reinterpret_cast<uint32_t*>(GetData() + slot_offset + 4) = tuple_size;
 
         return true;
     }
-   
+
     void TablePage::SetSlot(uint32_t slot_idx, uint32_t offset, uint32_t length) {
         uint32_t slot_offset = SIZE_TABLE_PAGE_HEADER + (slot_idx * SIZE_SLOT);
         *reinterpret_cast<uint32_t*>(GetData() + slot_offset) = offset;
@@ -92,10 +177,7 @@ namespace tetodb {
         uint32_t free_ptr = GetFreeSpacePointer();
         uint32_t header_end = SIZE_TABLE_PAGE_HEADER + (GetSlotCount() * SIZE_SLOT);
 
-        if (header_end > free_ptr) {
-            // Should not happen, implies corruption
-            return 0;
-        }
+        if (header_end > free_ptr) return 0;
         return free_ptr - header_end;
     }
 

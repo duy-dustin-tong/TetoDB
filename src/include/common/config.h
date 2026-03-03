@@ -10,6 +10,7 @@ namespace tetodb {
 	static constexpr int32_t INVALID_PAGE_ID = -1;
 	static constexpr int32_t INVALID_FRAME_ID = -1;
 	static constexpr int32_t INVALID_LSN = -1;
+	static constexpr int32_t INVALID_TRANSACTION_ID = -1;
 
 	// type aliases
 	using page_id_t = int32_t;	// identifier for page on disk
