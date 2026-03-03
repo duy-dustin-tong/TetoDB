@@ -64,7 +64,6 @@ TetoDBInstance::~TetoDBInstance() {
 
 QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
                                          ClientSession &session) {
-  std::lock_guard<std::mutex> lock(execution_mutex_);
   QueryResult res;
 
   // =========================================================
@@ -238,6 +237,7 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
 
     // 2. DDL Logic
     if (ast->type_ == ASTNodeType::CREATE_TABLE_STATEMENT) {
+      std::unique_lock<std::shared_mutex> ddl_lock(ddl_latch_);
       auto *create_stmt = static_cast<CreateTableStatement *>(ast.get());
       std::vector<Column> cols;
       std::vector<uint32_t> pk_cols;
@@ -262,6 +262,7 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
       } else
         throw std::runtime_error("Table already exists");
     } else if (ast->type_ == ASTNodeType::CREATE_INDEX_STATEMENT) {
+      std::unique_lock<std::shared_mutex> ddl_lock(ddl_latch_);
       auto *c_idx = static_cast<CreateIndexStatement *>(ast.get());
       if (catalog_->CreateIndex(c_idx->index_name_, c_idx->table_name_,
                                 c_idx->index_columns_, c_idx->is_unique_,
@@ -270,6 +271,7 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
       } else
         throw std::runtime_error("Index creation failed");
     } else if (ast->type_ == ASTNodeType::DROP_TABLE_STATEMENT) {
+      std::unique_lock<std::shared_mutex> ddl_lock(ddl_latch_);
       auto *d_stmt = static_cast<DropTableStatement *>(ast.get());
       if (catalog_->DropTable(d_stmt->table_name_))
         res.status_msg = "DROP TABLE";
@@ -278,6 +280,7 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
     }
     // 3. DML/Query Logic
     else {
+      std::shared_lock<std::shared_mutex> dml_lock(ddl_latch_);
       ExecutionContext exec_ctx(catalog_.get(), bpm_.get(), exec_txn,
                                 lock_mgr_.get(), txn_mgr_.get(),
                                 &session.current_parameters);

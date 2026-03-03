@@ -6,7 +6,6 @@
 #include <mutex>
 #include <string>
 
-
 #include "catalog/catalog.h"
 #include "concurrency/lock_manager.h"
 #include "concurrency/transaction_manager.h"
@@ -15,7 +14,6 @@
 #include "storage/buffer/buffer_pool_manager.h"
 #include "storage/buffer/two_queue_replacer.h"
 #include "storage/disk/disk_manager.h"
-
 
 namespace tetodb {
 
@@ -56,7 +54,7 @@ private:
   std::unique_ptr<Catalog> catalog_;
   std::unique_ptr<CheckpointManager> checkpoint_mgr_;
 
-  std::mutex execution_mutex_; // Prevents concurrent DDL/DML conflicts
+  std::shared_mutex ddl_latch_; // Protects against concurrent DDL/DML conflicts
 };
 
 } // namespace tetodb
