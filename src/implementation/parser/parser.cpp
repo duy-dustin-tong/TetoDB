@@ -22,8 +22,37 @@ std::unique_ptr<ASTNode> Parser::ParseStatement() {
     return std::make_unique<ExplainStatement>(std::move(inner_stmt));
   }
 
-  if (Peek().value_ == "SELECT")
-    return ParseSelect();
+  if (Peek().value_ == "SELECT") {
+    std::unique_ptr<ASTNode> left_stmt = ParseSelect();
+
+    while (cursor_ < tokens_.size() && Peek().type_ == TokenType::KEYWORD &&
+           (Peek().value_ == "UNION" || Peek().value_ == "INTERSECT" ||
+            Peek().value_ == "EXCEPT")) {
+
+      std::string op_str = Advance().value_;
+      SetOpType op_type;
+      if (op_str == "UNION")
+        op_type = SetOpType::UNION;
+      else if (op_str == "INTERSECT")
+        op_type = SetOpType::INTERSECT;
+      else
+        op_type = SetOpType::EXCEPT;
+
+      bool is_all = false;
+      if (cursor_ < tokens_.size() && Peek().type_ == TokenType::KEYWORD &&
+          Peek().value_ == "ALL") {
+        Advance(); // consume ALL
+        is_all = true;
+      }
+
+      auto right_stmt = ParseSelect();
+
+      left_stmt = std::make_unique<SetOpStatement>(
+          op_type, is_all, std::move(left_stmt), std::move(right_stmt));
+    }
+
+    return left_stmt;
+  }
   if (Peek().value_ == "INSERT")
     return ParseInsert();
   if (Peek().value_ == "UPDATE")

@@ -33,7 +33,8 @@ enum class PlanType {
   Limit,  // Handles the LIMIT / OFFSET clauses
 
   TopN,
-  Distinct
+  Distinct,
+  SetOp
 };
 
 class AbstractPlanNode {

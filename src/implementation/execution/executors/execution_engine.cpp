@@ -13,10 +13,10 @@
 #include "execution/plans/nested_loop_join_plan.h"
 #include "execution/plans/projection_plan.h"
 #include "execution/plans/seq_scan_plan.h"
+#include "execution/plans/set_op_plan.h"
 #include "execution/plans/sort_plan.h"
 #include "execution/plans/topn_plan.h"
 #include "execution/plans/update_plan.h"
-
 
 // --- Executors ---
 #include "execution/executors/aggregation_executor.h"
@@ -30,10 +30,10 @@
 #include "execution/executors/nested_loop_join_executor.h"
 #include "execution/executors/projection_executor.h"
 #include "execution/executors/seq_scan_executor.h"
+#include "execution/executors/set_op_executor.h"
 #include "execution/executors/sort_executor.h"
 #include "execution/executors/topn_executor.h"
 #include "execution/executors/update_executor.h"
-
 
 namespace tetodb {
 
@@ -123,6 +123,13 @@ ExecutionEngine::CreateExecutor(const AbstractPlanNode *plan,
     auto child = CreateExecutor(distinct_plan->GetChildPlan(), exec_ctx);
     return std::make_unique<DistinctExecutor>(exec_ctx, distinct_plan,
                                               std::move(child));
+  }
+  case PlanType::SetOp: {
+    const auto *setop_plan = static_cast<const SetOpPlanNode *>(plan);
+    auto left = CreateExecutor(setop_plan->GetLeftPlan(), exec_ctx);
+    auto right = CreateExecutor(setop_plan->GetRightPlan(), exec_ctx);
+    return std::make_unique<SetOpExecutor>(exec_ctx, setop_plan,
+                                           std::move(left), std::move(right));
   }
   default:
     throw std::runtime_error("ExecutionEngine Error: Unsupported PlanType");

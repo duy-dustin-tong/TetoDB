@@ -1,0 +1,30 @@
+CREATE TABLE t1 (id INT, val VARCHAR(20));
+CREATE TABLE t2 (id INT, val VARCHAR(20));
+
+INSERT INTO t1 VALUES (1, 'A');
+INSERT INTO t1 VALUES (2, 'B');
+INSERT INTO t1 VALUES (3, 'C');
+INSERT INTO t1 VALUES (3, 'C');
+
+INSERT INTO t2 VALUES (2, 'B');
+INSERT INTO t2 VALUES (3, 'C');
+INSERT INTO t2 VALUES (4, 'D');
+INSERT INTO t2 VALUES (5, 'E');
+
+-- UNION ALL: Should return all 8 rows (unordered)
+SELECT * FROM t1 UNION ALL SELECT * FROM t2;
+
+-- UNION: Should return {1,'A'}, {2,'B'}, {3,'C'}, {4,'D'}, {5,'E'} (5 rows)
+SELECT * FROM t1 UNION SELECT * FROM t2;
+
+-- INTERSECT: Should return {2,'B'}, {3,'C'} (2 rows)
+SELECT * FROM t1 INTERSECT SELECT * FROM t2;
+
+-- EXCEPT: Should return {1,'A'} (1 row)
+SELECT * FROM t1 EXCEPT SELECT * FROM t2;
+
+-- Check chaining (t1 UNION t2) EXCEPT (t1 INTERSECT t2) -> Should be {1,'A', 4,'D', 5,'E'}
+SELECT * FROM t1 UNION SELECT * FROM t2 EXCEPT SELECT * FROM t1 INTERSECT SELECT * FROM t2;
+
+DROP TABLE t1;
+DROP TABLE t2;

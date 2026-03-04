@@ -37,6 +37,7 @@ enum class ASTNodeType {
   JOIN,
   ORDER_BY,
   AGGREGATE,
+  SETOP_STATEMENT, // UNION / INTERSECT / EXCEPT
   PARAMETER_EXPR
 };
 
@@ -158,6 +159,47 @@ struct NotExpr : public Expr {
 
   std::string ToString(int indent = 0) const override {
     return Indent(indent) + "[NotExpr]\n" + child_->ToString(indent + 1);
+  }
+};
+
+enum class SetOpType { UNION, INTERSECT, EXCEPT };
+
+struct SetOpStatement : public ASTNode {
+  SetOpType set_op_type_;
+  bool is_all_;
+  std::unique_ptr<ASTNode> left_;
+  std::unique_ptr<ASTNode> right_;
+
+  SetOpStatement(SetOpType op_type, bool is_all, std::unique_ptr<ASTNode> left,
+                 std::unique_ptr<ASTNode> right)
+      : set_op_type_(op_type), is_all_(is_all), left_(std::move(left)),
+        right_(std::move(right)) {
+    type_ = ASTNodeType::SETOP_STATEMENT;
+  }
+
+  std::string ToString(int indent = 0) const override {
+    std::string op_str;
+    switch (set_op_type_) {
+    case SetOpType::UNION:
+      op_str = "UNION";
+      break;
+    case SetOpType::INTERSECT:
+      op_str = "INTERSECT";
+      break;
+    case SetOpType::EXCEPT:
+      op_str = "EXCEPT";
+      break;
+    }
+    if (is_all_) {
+      op_str += " ALL";
+    }
+
+    std::string res = Indent(indent) + "[[ SET OPERATION : " + op_str + " ]]\n";
+    res += Indent(indent + 1) + "- LEFT:\n";
+    res += left_->ToString(indent + 2);
+    res += Indent(indent + 1) + "- RIGHT:\n";
+    res += right_->ToString(indent + 2);
+    return res;
   }
 };
 

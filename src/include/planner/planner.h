@@ -24,6 +24,7 @@
 #include "execution/plans/nested_loop_join_plan.h"
 #include "execution/plans/projection_plan.h"
 #include "execution/plans/seq_scan_plan.h"
+#include "execution/plans/set_op_plan.h"
 #include "execution/plans/update_plan.h"
 
 namespace tetodb {
@@ -40,6 +41,7 @@ private:
   const AbstractPlanNode *PlanInsert(const InsertStatement *stmt);
   const AbstractPlanNode *PlanUpdate(const UpdateStatement *stmt);
   const AbstractPlanNode *PlanDelete(const DeleteStatement *stmt);
+  const AbstractPlanNode *PlanSetOp(const SetOpStatement *stmt);
 
   // --- NEW: Added alias_map parameter for alias resolution ---
   std::unique_ptr<AbstractExpression> PlanExpression(

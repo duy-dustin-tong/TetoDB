@@ -30,8 +30,10 @@ const AbstractPlanNode *Planner::PlanQuery(const ASTNode *ast) {
     return PlanUpdate(static_cast<const UpdateStatement *>(ast));
   } else if (ast->type_ == ASTNodeType::DELETE_STATEMENT) {
     return PlanDelete(static_cast<const DeleteStatement *>(ast));
+  } else if (ast->type_ == ASTNodeType::SETOP_STATEMENT) {
+    return PlanSetOp(static_cast<const SetOpStatement *>(ast));
   }
-  throw std::runtime_error("Planner Error: Unsupported AST Node Type");
+  throw std::runtime_error("Planner Error: Unsupported statement type");
 }
 
 const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
@@ -677,6 +679,34 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
   }
 
   throw std::runtime_error("Planner Error: Unsupported expression type");
+}
+
+const AbstractPlanNode *Planner::PlanSetOp(const SetOpStatement *stmt) {
+  const AbstractPlanNode *left_plan = PlanQuery(stmt->left_.get());
+  const AbstractPlanNode *right_plan = PlanQuery(stmt->right_.get());
+
+  const Schema *left_schema = left_plan->OutputSchema();
+  const Schema *right_schema = right_plan->OutputSchema();
+
+  if (left_schema->GetColumnCount() != right_schema->GetColumnCount()) {
+    throw std::runtime_error(
+        "Planner Error: EXCEPT/INTERSECT/UNION schemas must match in length.");
+  }
+
+  for (uint32_t i = 0; i < left_schema->GetColumnCount(); i++) {
+    if (left_schema->GetColumn(i).GetTypeId() !=
+        right_schema->GetColumn(i).GetTypeId()) {
+      throw std::runtime_error(
+          "Planner Error: Schema types do not match in Set Operation.");
+    }
+  }
+
+  auto setop_plan = std::make_unique<SetOpPlanNode>(
+      left_schema, left_plan, right_plan, stmt->set_op_type_, stmt->is_all_);
+  const AbstractPlanNode *plan_ptr = setop_plan.get();
+  plan_nodes_.push_back(std::move(setop_plan));
+
+  return plan_ptr;
 }
 
 } // namespace tetodb

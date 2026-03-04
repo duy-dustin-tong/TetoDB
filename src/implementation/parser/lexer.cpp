@@ -7,19 +7,22 @@ namespace tetodb {
 
 // Define our recognized keywords (in uppercase for case-insensitive matching)
 const std::unordered_set<std::string> Lexer::keywords_ = {
-    "SELECT",     "FROM",       "WHERE",   "AS",      "INSERT",    "INTO",
-    "VALUES",     "UPDATE",     "SET",     "DELETE",  "CREATE",    "TABLE",
-    "INT",        "INTEGER",    "VARCHAR", "JOIN",    "ON",        "AND",
-    "OR",         "GROUP",      "BY",      "SUM",     "COUNT",     "AVG",
-    "LIMIT",      "OFFSET",     "INDEX",   "UNIQUE",  "PRIMARY",   "KEY",
-    "FOREIGN",    "REFERENCES", "CASCADE", "LIKE",    "ILIKE",     "BEGIN",
-    "COMMIT",     "ROLLBACK",   "DROP",    "EXPLAIN", "SAVEPOINT", "RELEASE",
-    "DEALLOCATE", "TO",         "ALL",     "NULL",    "IS",        "NOT",
-    "BOOLEAN",    "DECIMAL",    "FLOAT",   "DATE",    "TIMESTAMP", "TRUE",
-    "FALSE",      "RESTRICT",   "MIN",     "MAX",     "ORDER",     "ASC",
-    "DESC",       "HAVING",     "AVERAGE", "MED",     "MEDIAN",    "BETWEEN",
-    "IN",         "UPPER",      "LOWER",   "LENGTH",  "CONCAT",    "SUBSTRING",
-    "DISTINCT"};
+    "SELECT",    "FROM",       "WHERE",      "AS",      "INSERT",
+    "INTO",      "VALUES",     "UPDATE",     "SET",     "DELETE",
+    "CREATE",    "TABLE",      "INT",        "INTEGER", "VARCHAR",
+    "JOIN",      "ON",         "AND",        "OR",      "GROUP",
+    "BY",        "SUM",        "COUNT",      "AVG",     "LIMIT",
+    "OFFSET",    "INDEX",      "UNIQUE",     "PRIMARY", "KEY",
+    "FOREIGN",   "REFERENCES", "CASCADE",    "LIKE",    "ILIKE",
+    "BEGIN",     "COMMIT",     "ROLLBACK",   "DROP",    "EXPLAIN",
+    "SAVEPOINT", "RELEASE",    "DEALLOCATE", "TO",      "ALL",
+    "NULL",      "IS",         "NOT",        "BOOLEAN", "DECIMAL",
+    "FLOAT",     "DATE",       "TIMESTAMP",  "TRUE",    "FALSE",
+    "RESTRICT",  "MIN",        "MAX",        "ORDER",   "ASC",
+    "DESC",      "HAVING",     "AVERAGE",    "MED",     "MEDIAN",
+    "BETWEEN",   "IN",         "UPPER",      "LOWER",   "LENGTH",
+    "CONCAT",    "SUBSTRING",  "DISTINCT",   "UNION",   "INTERSECT",
+    "EXCEPT"};
 
 Lexer::Lexer(const std::string &input) : input_(input), cursor_(0) {}
 
