@@ -27,6 +27,10 @@ enum class ASTNodeType {
   COLUMN_REF,
   CONSTANT,
   BINARY_EXPR,
+  LOGICAL_EXPR,
+  NOT_EXPR,
+  IN_EXPR,
+  BETWEEN_EXPR,
   TABLE_REF,
   JOIN,
   ORDER_BY,
@@ -117,6 +121,88 @@ struct BinaryExpr : public Expr {
     std::string res = Indent(indent) + "[BinaryExpr: " + op_ + "]\n";
     res += left_->ToString(indent + 1);
     res += right_->ToString(indent + 1);
+    return res;
+  }
+};
+
+// E.g., a > 5 AND b < 10
+struct LogicalExpr : public Expr {
+  std::unique_ptr<Expr> left_;
+  std::string op_; // AND, OR
+  std::unique_ptr<Expr> right_;
+
+  LogicalExpr(std::unique_ptr<Expr> l, std::string op, std::unique_ptr<Expr> r)
+      : left_(std::move(l)), op_(op), right_(std::move(r)) {
+    type_ = ASTNodeType::LOGICAL_EXPR;
+  }
+
+  std::string ToString(int indent = 0) const override {
+    std::string res = Indent(indent) + "[LogicalExpr: " + op_ + "]\n";
+    if (left_)
+      res += left_->ToString(indent + 1);
+    if (right_)
+      res += right_->ToString(indent + 1);
+    return res;
+  }
+};
+
+// E.g., NOT (a > 5)
+struct NotExpr : public Expr {
+  std::unique_ptr<Expr> child_;
+
+  NotExpr(std::unique_ptr<Expr> child) : child_(std::move(child)) {
+    type_ = ASTNodeType::NOT_EXPR;
+  }
+
+  std::string ToString(int indent = 0) const override {
+    return Indent(indent) + "[NotExpr]\n" + child_->ToString(indent + 1);
+  }
+};
+
+// E.g., id IN (1, 2, 3)
+struct InExpr : public Expr {
+  std::unique_ptr<Expr> left_;
+  std::vector<std::unique_ptr<Expr>> in_list_;
+  bool is_not_;
+
+  InExpr(std::unique_ptr<Expr> l, std::vector<std::unique_ptr<Expr>> list,
+         bool is_not = false)
+      : left_(std::move(l)), in_list_(std::move(list)), is_not_(is_not) {
+    type_ = ASTNodeType::IN_EXPR;
+  }
+
+  std::string ToString(int indent = 0) const override {
+    std::string res =
+        Indent(indent) + "[InExpr" + (is_not_ ? " NOT" : "") + "]\n";
+    res += left_->ToString(indent + 1);
+    res += Indent(indent + 1) + "- IN LIST:\n";
+    for (const auto &expr : in_list_) {
+      res += expr->ToString(indent + 2);
+    }
+    return res;
+  }
+};
+
+// E.g., age BETWEEN 18 AND 65
+struct BetweenExpr : public Expr {
+  std::unique_ptr<Expr> expr_;
+  std::unique_ptr<Expr> lower_;
+  std::unique_ptr<Expr> upper_;
+  bool is_not_;
+
+  BetweenExpr(std::unique_ptr<Expr> expr, std::unique_ptr<Expr> lower,
+              std::unique_ptr<Expr> upper, bool is_not = false)
+      : expr_(std::move(expr)), lower_(std::move(lower)),
+        upper_(std::move(upper)), is_not_(is_not) {
+    type_ = ASTNodeType::BETWEEN_EXPR;
+  }
+
+  std::string ToString(int indent = 0) const override {
+    std::string res =
+        Indent(indent) + "[BetweenExpr" + (is_not_ ? " NOT" : "") + "]\n";
+    res += expr_->ToString(indent + 1);
+    res += Indent(indent + 1) + "- LOWER:\n" + lower_->ToString(indent + 2);
+    res += Indent(indent + 1) + "- UPPER:\n" + upper_->ToString(indent + 2);
     return res;
   }
 };

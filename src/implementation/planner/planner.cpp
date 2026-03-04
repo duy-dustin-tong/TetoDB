@@ -4,12 +4,16 @@
 
 #include "planner/planner.h"
 #include "execution/expressions/column_value_expression.h"
+#include "execution/expressions/comparison_expression.h"
 #include "execution/expressions/constant_value_expression.h"
+#include "execution/expressions/in_expression.h"
+#include "execution/expressions/logic_expression.h"
 #include "execution/expressions/parameter_value_expression.h"
 #include "execution/plans/aggregation_plan.h"
 #include "execution/plans/limit_plan.h"
 #include "execution/plans/sort_plan.h"
 #include <unordered_map>
+
 
 namespace tetodb {
 
@@ -567,6 +571,51 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
 
     return std::make_unique<ComparisonExpression>(it->second, std::move(left),
                                                   std::move(right));
+  }
+
+  if (const auto *log_expr = dynamic_cast<const LogicalExpr *>(ast_expr)) {
+    auto left = PlanExpression(log_expr->left_.get(), schema, alias_map);
+    auto right = PlanExpression(log_expr->right_.get(), schema, alias_map);
+    LogicType type = log_expr->op_ == "AND" ? LogicType::AND : LogicType::OR;
+    return std::make_unique<LogicExpression>(type, std::move(left),
+                                             std::move(right));
+  }
+
+  if (const auto *not_expr = dynamic_cast<const NotExpr *>(ast_expr)) {
+    auto child = PlanExpression(not_expr->child_.get(), schema, alias_map);
+    return std::make_unique<LogicExpression>(LogicType::NOT, std::move(child));
+  }
+
+  if (const auto *in_expr = dynamic_cast<const InExpr *>(ast_expr)) {
+    auto left = PlanExpression(in_expr->left_.get(), schema, alias_map);
+    std::vector<std::unique_ptr<AbstractExpression>> list;
+    for (const auto &item : in_expr->in_list_) {
+      list.push_back(PlanExpression(item.get(), schema, alias_map));
+    }
+    return std::make_unique<InExpression>(std::move(left), std::move(list),
+                                          in_expr->is_not_);
+  }
+
+  if (const auto *btw_expr = dynamic_cast<const BetweenExpr *>(ast_expr)) {
+    auto target1 = PlanExpression(btw_expr->expr_.get(), schema, alias_map);
+    auto target2 = PlanExpression(btw_expr->expr_.get(), schema, alias_map);
+
+    auto lower = PlanExpression(btw_expr->lower_.get(), schema, alias_map);
+    auto upper = PlanExpression(btw_expr->upper_.get(), schema, alias_map);
+
+    auto comp1 = std::make_unique<ComparisonExpression>(
+        CompType::GREATER_THAN_OR_EQUAL, std::move(target1), std::move(lower));
+    auto comp2 = std::make_unique<ComparisonExpression>(
+        CompType::LESS_THAN_OR_EQUAL, std::move(target2), std::move(upper));
+
+    auto logical_and = std::make_unique<LogicExpression>(
+        LogicType::AND, std::move(comp1), std::move(comp2));
+
+    if (btw_expr->is_not_) {
+      return std::make_unique<LogicExpression>(LogicType::NOT,
+                                               std::move(logical_and));
+    }
+    return logical_and;
   }
 
   throw std::runtime_error("Planner Error: Unsupported expression type");

@@ -408,7 +408,46 @@ std::unique_ptr<SelectStatement> Parser::ParseSelect() {
   return stmt;
 }
 
-std::unique_ptr<Expr> Parser::ParseExpression() {
+std::unique_ptr<Expr> Parser::ParseExpression() { return ParseOrExpression(); }
+
+std::unique_ptr<Expr> Parser::ParseOrExpression() {
+  auto left = ParseAndExpression();
+  while (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "OR") {
+    std::string op = Advance().value_;
+    auto right = ParseAndExpression();
+    left = std::make_unique<LogicalExpr>(std::move(left), op, std::move(right));
+  }
+  return left;
+}
+
+std::unique_ptr<Expr> Parser::ParseAndExpression() {
+  auto left = ParseNotExpression();
+  while (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "AND") {
+    std::string op = Advance().value_;
+    auto right = ParseNotExpression();
+    left = std::make_unique<LogicalExpr>(std::move(left), op, std::move(right));
+  }
+  return left;
+}
+
+std::unique_ptr<Expr> Parser::ParseNotExpression() {
+  if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "NOT") {
+    Advance();
+    auto child =
+        ParseComparisonExpression(); // Because 'NOT a = b' is invalid in
+                                     // standard SQL, but PostgreSQL supports
+                                     // 'NOT (a = b)' via parenthesis. Wait,
+                                     // standard SQL allows NOT IN and NOT
+                                     // BETWEEN. We will handle NOT IN inside
+                                     // ParseComparisonExpression. This leading
+                                     // NOT is purely unary prefix, like NOT
+                                     // valid.
+    return std::make_unique<NotExpr>(std::move(child));
+  }
+  return ParseComparisonExpression();
+}
+
+std::unique_ptr<Expr> Parser::ParseComparisonExpression() {
   auto left = ParseBaseExpression();
 
   if (Peek().type_ == TokenType::SYMBOL &&
@@ -418,8 +457,7 @@ std::unique_ptr<Expr> Parser::ParseExpression() {
 
     std::string op = Advance().value_;
     auto right = ParseBaseExpression();
-
-    return std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
+    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
   }
 
   if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "IS") {
@@ -431,17 +469,56 @@ std::unique_ptr<Expr> Parser::ParseExpression() {
     }
     if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "NULL") {
       Advance();
-      return std::make_unique<BinaryExpr>(
+      left = std::make_unique<BinaryExpr>(
           std::move(left), op, std::make_unique<ConstantExpr>("NULL"));
     } else {
       throw std::runtime_error("Syntax Error: Expected 'NULL' after 'IS'");
     }
   }
 
+  // Handle potential trailing [NOT] IN / BETWEEN
+  bool is_not = false;
+  if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "NOT") {
+    is_not = true;
+    Advance();
+  }
+
+  if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "IN") {
+    Advance();
+    Consume(TokenType::SYMBOL, "(");
+    std::vector<std::unique_ptr<Expr>> in_list;
+    do {
+      in_list.push_back(ParseExpression());
+    } while (Match(TokenType::SYMBOL, ","));
+    Consume(TokenType::SYMBOL, ")");
+    return std::make_unique<InExpr>(std::move(left), std::move(in_list),
+                                    is_not);
+  }
+
+  if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "BETWEEN") {
+    Advance();
+    auto lower = ParseBaseExpression();
+    Consume(TokenType::KEYWORD, "AND");
+    auto upper = ParseBaseExpression();
+    return std::make_unique<BetweenExpr>(std::move(left), std::move(lower),
+                                         std::move(upper), is_not);
+  }
+
+  if (is_not) {
+    throw std::runtime_error("Syntax Error: Unexpected NOT after expression "
+                             "(expected IN or BETWEEN)");
+  }
+
   return left;
 }
 
 std::unique_ptr<Expr> Parser::ParseBaseExpression() {
+  if (Match(TokenType::SYMBOL, "(")) {
+    auto expr = ParseExpression();
+    Consume(TokenType::SYMBOL, ")");
+    return expr;
+  }
+
   if (Match(TokenType::KEYWORD, "NULL")) {
     return std::make_unique<ConstantExpr>("NULL");
   }
