@@ -321,6 +321,14 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
     plan_nodes_.push_back(std::move(limit_plan));
   }
 
+  // --- THE DISTINCT WRAPPER ---
+  if (stmt->is_distinct_) {
+    auto distinct_plan =
+        std::make_unique<DistinctPlanNode>(out_schema_ptr, current_root);
+    current_root = distinct_plan.get();
+    plan_nodes_.push_back(std::move(distinct_plan));
+  }
+
   return current_root;
 }
 

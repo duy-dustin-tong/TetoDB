@@ -1,0 +1,11 @@
+CREATE TABLE utest (id INTEGER PRIMARY KEY, val VARCHAR, num INTEGER);
+INSERT INTO utest VALUES (1, 'alpha', 10);
+INSERT INTO utest VALUES (2, 'beta', 20);
+INSERT INTO utest VALUES (3, 'gamma', 30);
+UPDATE utest SET val = 'UPDATED' WHERE id = 2;
+SELECT id, val, num FROM utest;
+UPDATE utest SET num = 99 WHERE id = 1;
+SELECT id, val, num FROM utest;
+UPDATE utest SET val = 'ALL', num = 0 WHERE num = 30;
+SELECT id, val, num FROM utest;
+DROP TABLE utest;

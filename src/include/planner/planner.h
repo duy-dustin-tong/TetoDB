@@ -9,17 +9,16 @@
 #include <unordered_map>
 #include <vector>
 
-
 #include "catalog/catalog.h"
 #include "execution/execution_context.h"
 #include "execution/expressions/abstract_expression.h"
 #include "parser/ast.h"
 
-
 // --- ONLY INCLUDE PLAN NODES, NO EXECUTORS ---
 #include "execution/expressions/comparison_expression.h"
 #include "execution/plans/abstract_plan.h"
 #include "execution/plans/delete_plan.h"
+#include "execution/plans/distinct_plan.h"
 #include "execution/plans/filter_plan.h"
 #include "execution/plans/insert_plan.h"
 #include "execution/plans/nested_loop_join_plan.h"

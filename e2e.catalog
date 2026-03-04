@@ -1,6 +1,0 @@
-TABLE users 0
-COLUMN id 4
-COLUMN name 7
-COLUMN age 4
-END
-INDEX pk_users 0 -1 1 1 0 

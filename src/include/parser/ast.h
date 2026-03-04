@@ -308,6 +308,8 @@ struct SelectStatement : public ASTNode {
   std::vector<std::unique_ptr<Expr>> group_bys_;
   std::vector<std::unique_ptr<OrderByNode>> order_bys_;
 
+  bool is_distinct_{false};
+
   int32_t limit_count_{-1}; // -1 means no limit
   int32_t offset_count_{0};
 

@@ -358,6 +358,10 @@ std::unique_ptr<SelectStatement> Parser::ParseSelect() {
     throw std::runtime_error("Syntax Error: Query must start with SELECT");
   }
 
+  if (Match(TokenType::KEYWORD, "DISTINCT")) {
+    stmt->is_distinct_ = true;
+  }
+
   do {
     if (Match(TokenType::SYMBOL, "*")) {
       stmt->select_list_.push_back(std::make_unique<ColumnRefExpr>("", "*"));
