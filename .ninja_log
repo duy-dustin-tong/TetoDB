@@ -55,3 +55,6 @@
 2	631	7943021950261244	CMakeFiles/tetodb_lib.dir/src/implementation/parser/lexer.cpp.obj	fdccea426699614e
 642	1042	7943021956731543	tetodb_lib.lib	cfbd4c4ea7628e16
 1042	1320	7943021960657754	teto_main.exe	945a010047f92329
+3	1927	7943025487566420	CMakeFiles/tetodb_lib.dir/src/implementation/planner/planner.cpp.obj	905701ef0a5eab7d
+1928	2235	7943025506813693	tetodb_lib.lib	cfbd4c4ea7628e16
+2235	2472	7943025509869464	teto_main.exe	945a010047f92329

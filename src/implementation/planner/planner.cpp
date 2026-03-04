@@ -62,8 +62,8 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
   plan_nodes_.push_back(std::move(left_scan));
 
   // --- JOINS ---
-  if (!stmt->joins_.empty()) {
-    const auto *join_ast = stmt->joins_[0].get();
+  for (const auto &join_stmt : stmt->joins_) {
+    const auto *join_ast = join_stmt.get();
 
     std::string right_table_name = join_ast->right_table_->table_name_;
     TableMetadata *right_meta = catalog_->GetTable(right_table_name);
@@ -94,8 +94,8 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
     const auto *right_col_ast =
         static_cast<const ColumnRefExpr *>(bin_expr->right_.get());
 
-    uint32_t left_col_idx =
-        left_meta->schema_.GetColIdx(left_col_ast->col_name_);
+    uint32_t left_col_idx = current_schema->GetColIdx(
+        left_col_ast->col_name_); // Use current_schema
     uint32_t right_col_idx =
         right_meta->schema_.GetColIdx(right_col_ast->col_name_);
 
@@ -123,7 +123,8 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
     const AbstractExpression *predicate_ptr = comp_expr.get();
     expressions_.push_back(std::move(comp_expr));
 
-    std::vector<Column> joined_cols = left_meta->schema_.GetColumns();
+    std::vector<Column> joined_cols =
+        current_schema->GetColumns(); // Use current_schema
     for (const auto &col : right_meta->schema_.GetColumns()) {
       joined_cols.push_back(col);
     }
