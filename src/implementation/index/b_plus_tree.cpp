@@ -574,5 +574,7 @@ template class BPlusTree<GenericKey<8>, RID, GenericComparator<8>>;
 template class BPlusTree<GenericKey<16>, RID, GenericComparator<16>>;
 template class BPlusTree<GenericKey<32>, RID, GenericComparator<32>>;
 template class BPlusTree<GenericKey<64>, RID, GenericComparator<64>>;
+template class BPlusTree<GenericKey<128>, RID, GenericComparator<128>>;
+template class BPlusTree<GenericKey<256>, RID, GenericComparator<256>>;
 
 } // namespace tetodb

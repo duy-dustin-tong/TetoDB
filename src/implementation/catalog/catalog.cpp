@@ -11,6 +11,7 @@ namespace tetodb {
 bool Catalog::CreateTable(const std::string &table_name, const Schema &schema,
                           page_id_t root_page_id,
                           const std::vector<uint32_t> &primary_keys,
+                          const std::vector<uint32_t> &unique_keys,
                           const std::vector<ForeignKeyDef> &fk_defs) {
   std::unique_lock<std::mutex> lock(latch_);
 
@@ -75,6 +76,13 @@ bool Catalog::CreateTable(const std::string &table_name, const Schema &schema,
     std::string pk_name = "pk_" + table_name;
     // --- UPDATED: Pass 'true' for is_unique ---
     CreateIndex(pk_name, table_oid, primary_keys, true, nullptr);
+  }
+
+  // --- NEW: Mount unique constraints! ---
+  for (uint32_t unique_col : unique_keys) {
+    std::string unq_name =
+        "unique_" + table_name + "_" + schema.GetColumn(unique_col).GetName();
+    CreateIndex(unq_name, table_oid, {unique_col}, true, nullptr);
   }
 
   SaveCatalog(catalog_path_);
@@ -196,9 +204,29 @@ IndexMetadata *Catalog::CreateIndex(const std::string &index_name,
         BPlusTreeIndex<GenericKey<64>, RID, GenericComparator<64>>>(
         index_name, bpm_, comparator, leaf_max, internal_max,
         std::move(key_schema), root_page_id);
+  } else if (key_size <= 128) {
+    GenericComparator<128> comparator(key_type);
+    uint32_t leaf_max =
+        (PAGE_SIZE - 28) / (sizeof(GenericKey<128>) + sizeof(RID)) - 1;
+    uint32_t internal_max =
+        (PAGE_SIZE - 24) / (sizeof(GenericKey<128>) + sizeof(page_id_t)) - 1;
+    index = std::make_unique<
+        BPlusTreeIndex<GenericKey<128>, RID, GenericComparator<128>>>(
+        index_name, bpm_, comparator, leaf_max, internal_max,
+        std::move(key_schema), root_page_id);
+  } else if (key_size <= 256) {
+    GenericComparator<256> comparator(key_type);
+    uint32_t leaf_max =
+        (PAGE_SIZE - 28) / (sizeof(GenericKey<256>) + sizeof(RID)) - 1;
+    uint32_t internal_max =
+        (PAGE_SIZE - 24) / (sizeof(GenericKey<256>) + sizeof(page_id_t)) - 1;
+    index = std::make_unique<
+        BPlusTreeIndex<GenericKey<256>, RID, GenericComparator<256>>>(
+        index_name, bpm_, comparator, leaf_max, internal_max,
+        std::move(key_schema), root_page_id);
   } else {
     throw std::runtime_error(
-        "Index key size exceeds maximum supported 64 bytes!");
+        "Index key size exceeds maximum supported 256 bytes!");
   }
 
   index_oid_t oid = next_index_oid_++;
@@ -472,7 +500,8 @@ void Catalog::LoadCatalog(const std::string &file_path) {
     } else if (token == "END") {
       Schema schema(current_cols);
       CreateTable(current_table, schema, current_first_page_id,
-                  std::vector<uint32_t>{}, std::vector<ForeignKeyDef>{});
+                  std::vector<uint32_t>{}, std::vector<uint32_t>{},
+                  std::vector<ForeignKeyDef>{});
     }
   }
 }

@@ -122,5 +122,9 @@ template class BPlusTreeInternalPage<GenericKey<32>, page_id_t,
                                      GenericComparator<32>>;
 template class BPlusTreeInternalPage<GenericKey<64>, page_id_t,
                                      GenericComparator<64>>;
+template class BPlusTreeInternalPage<GenericKey<128>, page_id_t,
+                                     GenericComparator<128>>;
+template class BPlusTreeInternalPage<GenericKey<256>, page_id_t,
+                                     GenericComparator<256>>;
 
 } // namespace tetodb

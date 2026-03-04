@@ -342,6 +342,7 @@ struct ColumnDef {
 
   bool is_primary_key_ = false;
   bool is_not_null_ = false;
+  bool is_unique_ = false;
 
   ColumnDef(std::string name, std::string type)
       : name_(std::move(name)), type_(std::move(type)) {}

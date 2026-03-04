@@ -242,6 +242,7 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
       auto *create_stmt = static_cast<CreateTableStatement *>(ast.get());
       std::vector<Column> cols;
       std::vector<uint32_t> pk_cols;
+      std::vector<uint32_t> unique_cols;
       uint32_t col_idx = 0;
       static const std::unordered_map<std::string, TypeId> type_map = {
           {"INT", TypeId::INTEGER},     {"INTEGER", TypeId::INTEGER},
@@ -261,12 +262,15 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
         if (c.is_primary_key_) {
           pk_cols.push_back(col_idx);
         }
+        if (c.is_unique_) {
+          unique_cols.push_back(col_idx);
+        }
         col.SetNullable(!c.is_not_null_ && !c.is_primary_key_);
         cols.push_back(col);
         col_idx++;
       }
       if (catalog_->CreateTable(create_stmt->table_name_, Schema(cols),
-                                INVALID_PAGE_ID, pk_cols,
+                                INVALID_PAGE_ID, pk_cols, unique_cols,
                                 create_stmt->foreign_keys_)) {
         res.status_msg = "CREATE TABLE";
       } else

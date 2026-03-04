@@ -10,7 +10,6 @@
 #include <unordered_map>
 #include <vector>
 
-
 #include "catalog/schema.h"
 #include "index/b_plus_tree_index.h"
 #include "index/index.h"
@@ -98,6 +97,7 @@ public:
   bool CreateTable(const std::string &table_name, const Schema &schema,
                    page_id_t root_page_id,
                    const std::vector<uint32_t> &primary_keys,
+                   const std::vector<uint32_t> &unique_keys = {},
                    const std::vector<ForeignKeyDef> &fk_defs = {});
   TableMetadata *GetTable(const std::string &table_name);
   TableMetadata *GetTable(table_oid_t table_oid);

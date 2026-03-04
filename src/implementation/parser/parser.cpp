@@ -274,6 +274,11 @@ std::unique_ptr<CreateTableStatement> Parser::ParseCreateTable() {
         }
       }
 
+      // Parse UNIQUE constraint
+      if (Match(TokenType::KEYWORD, "UNIQUE")) {
+        col.is_unique_ = true;
+      }
+
       stmt->columns_.push_back(col);
     }
   } while (Match(TokenType::SYMBOL, ","));
