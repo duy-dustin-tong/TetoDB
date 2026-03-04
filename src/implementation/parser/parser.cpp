@@ -1,6 +1,7 @@
 // parser.cpp
 
 #include "parser/parser.h"
+#include "parser/ast.h"
 #include <algorithm> // transform
 
 namespace tetodb {
@@ -63,6 +64,8 @@ std::unique_ptr<ASTNode> Parser::ParseStatement() {
   if (Peek().value_ == "CREATE") {
     if (Peek(1).value_ == "TABLE")
       return ParseCreateTable();
+    if (Peek(1).value_ == "VIEW")
+      return ParseCreateView();
     // --- NEW: Check for either CREATE INDEX or CREATE UNIQUE INDEX ---
     if (Peek(1).value_ == "INDEX" ||
         (Peek(1).value_ == "UNIQUE" && Peek(2).value_ == "INDEX"))
@@ -74,6 +77,8 @@ std::unique_ptr<ASTNode> Parser::ParseStatement() {
       return ParseDropTable();
     if (Peek(1).value_ == "INDEX")
       return ParseDropIndex();
+    if (Peek(1).value_ == "VIEW")
+      return ParseDropView();
     throw std::runtime_error("Syntax Error: Unknown DROP statement type");
   }
 
@@ -384,6 +389,39 @@ std::unique_ptr<CreateIndexStatement> Parser::ParseCreateIndex() {
   Consume(TokenType::SYMBOL, "Expected ')' to end index columns");
 
   return stmt;
+}
+
+std::unique_ptr<CreateViewStatement> Parser::ParseCreateView() {
+  Consume(TokenType::KEYWORD, "Expected CREATE");
+  if (!Match(TokenType::KEYWORD, "VIEW")) {
+    throw std::runtime_error("Expected VIEW keyword");
+  }
+
+  Consume(TokenType::IDENTIFIER, "Expected view name");
+  std::string view_name = tokens_[cursor_ - 1].value_;
+
+  Consume(TokenType::KEYWORD, "Expected AS");
+
+  auto query = ParseSelect();
+  return std::make_unique<CreateViewStatement>(std::move(view_name),
+                                               std::move(query));
+}
+
+std::unique_ptr<DropViewStatement> Parser::ParseDropView() {
+  Consume(TokenType::KEYWORD, "Expected DROP");
+  if (!Match(TokenType::KEYWORD, "VIEW")) {
+    throw std::runtime_error("Expected VIEW keyword");
+  }
+
+  Consume(TokenType::IDENTIFIER, "Expected view name");
+  std::string view_name = tokens_[cursor_ - 1].value_;
+
+  // Optional semicolon at the end
+  if (Match(TokenType::SYMBOL, ";")) {
+    // Semicolon consumed
+  }
+
+  return std::make_unique<DropViewStatement>(view_name);
 }
 
 std::unique_ptr<SelectStatement> Parser::ParseSelect() {

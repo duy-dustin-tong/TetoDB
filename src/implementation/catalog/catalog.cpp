@@ -419,6 +419,36 @@ bool Catalog::DropIndex(const std::string &index_name) {
   return true;
 }
 
+bool Catalog::CreateView(const std::string &view_name,
+                         std::unique_ptr<SelectStatement> query) {
+  std::lock_guard<std::mutex> lock(latch_);
+  if (views_.find(view_name) != views_.end()) {
+    return false; // View already exists
+  }
+  views_[view_name] =
+      std::make_unique<ViewMetadata>(view_name, std::move(query));
+  return true;
+}
+
+ViewMetadata *Catalog::GetView(const std::string &view_name) {
+  std::lock_guard<std::mutex> lock(latch_);
+  auto it = views_.find(view_name);
+  if (it == views_.end()) {
+    return nullptr;
+  }
+  return it->second.get();
+}
+
+bool Catalog::DropView(const std::string &view_name) {
+  std::lock_guard<std::mutex> lock(latch_);
+  auto it = views_.find(view_name);
+  if (it == views_.end()) {
+    return false; // View not found
+  }
+  views_.erase(it);
+  return true;
+}
+
 void Catalog::SaveCatalog(const std::string &file_path) {
   std::lock_guard<std::mutex> lock(latch_);
   std::ofstream out(file_path);

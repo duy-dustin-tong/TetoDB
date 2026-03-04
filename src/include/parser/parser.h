@@ -2,13 +2,29 @@
 
 #pragma once
 
-#include "parser/ast.h"
+#include "index/index.h"
 #include "parser/lexer.h"
 #include <memory>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 namespace tetodb {
+// Full definitions are in parser/ast.h, which is included in parser.cpp
+struct ASTNode;
+struct SelectStatement;
+struct InsertStatement;
+struct UpdateStatement;
+struct DeleteStatement;
+struct Expr;
+struct TableRef;
+struct JoinNode;
+struct CreateTableStatement;
+struct CreateIndexStatement;
+struct CreateViewStatement;
+struct DropTableStatement;
+struct DropIndexStatement;
+struct DropViewStatement;
 
 class Parser {
 public:
@@ -37,8 +53,10 @@ private:
   std::unique_ptr<JoinNode> ParseJoin();
   std::unique_ptr<CreateTableStatement> ParseCreateTable();
   std::unique_ptr<CreateIndexStatement> ParseCreateIndex();
+  std::unique_ptr<CreateViewStatement> ParseCreateView();
   std::unique_ptr<DropTableStatement> ParseDropTable(); // <-- ADDED
   std::unique_ptr<DropIndexStatement> ParseDropIndex();
+  std::unique_ptr<DropViewStatement> ParseDropView();
 
   // --- Token Helpers ---
   const Token &Peek(int offset = 0) const;

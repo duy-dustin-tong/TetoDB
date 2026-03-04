@@ -17,8 +17,10 @@ enum class ASTNodeType {
   DELETE_STATEMENT,
   CREATE_TABLE_STATEMENT,
   CREATE_INDEX_STATEMENT,
+  CREATE_VIEW_STATEMENT,
   DROP_TABLE_STATEMENT,
   DROP_INDEX_STATEMENT,
+  DROP_VIEW_STATEMENT,
   TRANSACTION_STATEMENT,
   EXPLAIN_STATEMENT,
   SAVEPOINT_STATEMENT,
@@ -555,6 +557,35 @@ struct DeleteStatement : public ASTNode {
       res += where_clause_->ToString(indent + 2);
     }
     return res;
+  }
+};
+
+// --- NEW VIEW NODES ---
+struct CreateViewStatement : public ASTNode {
+  std::string view_name_;
+  std::unique_ptr<SelectStatement> view_query_;
+
+  CreateViewStatement(std::string name, std::unique_ptr<SelectStatement> query)
+      : view_name_(std::move(name)), view_query_(std::move(query)) {
+    type_ = ASTNodeType::CREATE_VIEW_STATEMENT;
+  }
+
+  std::string ToString(int indent = 0) const override {
+    std::string res = Indent(indent) + "[CREATE VIEW " + view_name_ + " AS]\n";
+    res += view_query_->ToString(indent + 1);
+    return res;
+  }
+};
+
+struct DropViewStatement : public ASTNode {
+  std::string view_name_;
+
+  DropViewStatement(std::string name) : view_name_(std::move(name)) {
+    type_ = ASTNodeType::DROP_VIEW_STATEMENT;
+  }
+
+  std::string ToString(int indent = 0) const override {
+    return Indent(indent) + "[DROP VIEW " + view_name_ + "]\n";
   }
 };
 

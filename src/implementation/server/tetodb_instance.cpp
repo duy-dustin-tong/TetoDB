@@ -298,6 +298,23 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
         res.status_msg = "DROP INDEX";
       else
         throw std::runtime_error("Index not found");
+    } else if (ast->type_ == ASTNodeType::CREATE_VIEW_STATEMENT) {
+      std::unique_lock<std::shared_mutex> ddl_lock(ddl_latch_);
+      auto *c_view = static_cast<CreateViewStatement *>(ast.get());
+      if (catalog_->CreateView(c_view->view_name_,
+                               std::move(c_view->view_query_))) {
+        res.status_msg = "CREATE VIEW";
+      } else {
+        throw std::runtime_error("View already exists");
+      }
+    } else if (ast->type_ == ASTNodeType::DROP_VIEW_STATEMENT) {
+      std::unique_lock<std::shared_mutex> ddl_lock(ddl_latch_);
+      auto *d_view = static_cast<DropViewStatement *>(ast.get());
+      if (catalog_->DropView(d_view->view_name_)) {
+        res.status_msg = "DROP VIEW";
+      } else {
+        throw std::runtime_error("View not found");
+      }
     }
     // 3. DML/Query Logic
     else {

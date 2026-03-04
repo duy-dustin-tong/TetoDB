@@ -85,6 +85,17 @@ struct IndexMetadata {
 };
 
 /**
+ * ViewMetadata: A container for view AST logic.
+ */
+struct ViewMetadata {
+  ViewMetadata(std::string name, std::unique_ptr<SelectStatement> query)
+      : name_(std::move(name)), view_query_(std::move(query)) {}
+
+  std::string name_;
+  std::unique_ptr<SelectStatement> view_query_;
+};
+
+/**
  * Catalog: The "Phonebook" of the database.
  */
 class Catalog {
@@ -125,6 +136,11 @@ public:
   bool DropTable(const std::string &table_name);
   bool DropIndex(const std::string &index_name);
 
+  bool CreateView(const std::string &view_name,
+                  std::unique_ptr<SelectStatement> query);
+  ViewMetadata *GetView(const std::string &view_name);
+  bool DropView(const std::string &view_name);
+
   void SaveCatalog(const std::string &file_path);
   void LoadCatalog(const std::string &file_path);
 
@@ -146,6 +162,8 @@ private:
   std::unordered_map<index_oid_t, std::unique_ptr<IndexMetadata>> indexes_;
   std::unordered_map<table_oid_t, std::vector<IndexMetadata *>> table_indexes_;
   std::unordered_map<std::string, index_oid_t> index_names_;
+
+  std::unordered_map<std::string, std::unique_ptr<ViewMetadata>> views_;
 };
 
 } // namespace tetodb

@@ -62,12 +62,20 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
                              ? stmt->from_table_->table_name_
                              : stmt->from_table_->alias_;
     active_left_schema_ = current_schema;
+  } else if (ViewMetadata *view_meta =
+                 catalog_->GetView(stmt->from_table_->table_name_)) {
+    current_plan = PlanSelect(view_meta->view_query_.get());
+    current_schema = current_plan->OutputSchema();
+    active_left_alias_ = stmt->from_table_->alias_.empty()
+                             ? stmt->from_table_->table_name_
+                             : stmt->from_table_->alias_;
+    active_left_schema_ = current_schema;
   } else {
     std::string left_table_name = stmt->from_table_->table_name_;
     TableMetadata *left_meta = catalog_->GetTable(left_table_name);
     if (!left_meta)
-      throw std::runtime_error("Planner Error: Table '" + left_table_name +
-                               "' not found.");
+      throw std::runtime_error("Planner Error: Table or View '" +
+                               left_table_name + "' not found.");
 
     active_left_alias_ = stmt->from_table_->alias_.empty()
                              ? left_table_name
@@ -89,12 +97,34 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
     const Schema *right_schema = nullptr;
 
     if (join_ast->right_table_->subquery_) {
+      auto backup_left_alias = active_left_alias_;
+      auto backup_left_schema = active_left_schema_;
       right_scan_ptr = PlanSelect(join_ast->right_table_->subquery_.get());
+      active_left_alias_ = backup_left_alias;
+      active_left_schema_ = backup_left_schema;
+
       right_schema = right_scan_ptr->OutputSchema();
       active_right_alias_ = join_ast->right_table_->alias_;
     } else if (cte_map_.count(join_ast->right_table_->table_name_)) {
+      auto backup_left_alias = active_left_alias_;
+      auto backup_left_schema = active_left_schema_;
       right_scan_ptr =
           PlanSelect(cte_map_[join_ast->right_table_->table_name_]);
+      active_left_alias_ = backup_left_alias;
+      active_left_schema_ = backup_left_schema;
+
+      right_schema = right_scan_ptr->OutputSchema();
+      active_right_alias_ = join_ast->right_table_->alias_.empty()
+                                ? join_ast->right_table_->table_name_
+                                : join_ast->right_table_->alias_;
+    } else if (ViewMetadata *view_meta =
+                   catalog_->GetView(join_ast->right_table_->table_name_)) {
+      auto backup_left_alias = active_left_alias_;
+      auto backup_left_schema = active_left_schema_;
+      right_scan_ptr = PlanSelect(view_meta->view_query_.get());
+      active_left_alias_ = backup_left_alias;
+      active_left_schema_ = backup_left_schema;
+
       right_schema = right_scan_ptr->OutputSchema();
       active_right_alias_ = join_ast->right_table_->alias_.empty()
                                 ? join_ast->right_table_->table_name_
@@ -103,8 +133,8 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
       std::string right_table_name = join_ast->right_table_->table_name_;
       TableMetadata *right_meta = catalog_->GetTable(right_table_name);
       if (!right_meta)
-        throw std::runtime_error("Planner Error: Table '" + right_table_name +
-                                 "' not found.");
+        throw std::runtime_error("Planner Error: Table or View '" +
+                                 right_table_name + "' not found.");
 
       active_right_alias_ = join_ast->right_table_->alias_.empty()
                                 ? right_table_name
@@ -684,7 +714,14 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
     std::vector<std::unique_ptr<AbstractExpression>> list;
 
     if (in_expr->subquery_) {
+      auto backup_left_alias = active_left_alias_;
+      auto backup_left_schema = active_left_schema_;
+
       const AbstractPlanNode *subplan = PlanSelect(in_expr->subquery_.get());
+
+      active_left_alias_ = backup_left_alias;
+      active_left_schema_ = backup_left_schema;
+
       auto executor = ExecutionEngine::CreateExecutor(subplan, exec_ctx_);
       executor->Init();
 
