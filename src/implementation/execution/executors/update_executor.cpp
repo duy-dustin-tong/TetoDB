@@ -2,9 +2,9 @@
 
 #include "execution/executors/update_executor.h"
 #include "execution/execution_context.h"
+#include "execution/fk_constraint_handler.h"
 #include <stdexcept>
 #include <vector>
-
 
 namespace tetodb {
 
@@ -107,9 +107,70 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
       }
     }
 
-    // [Foreign Key Enforcement logic remains exactly the same as your previous
-    // code...] (I have kept it unchanged in the background to save space, make
-    // sure you don't delete your FK blocks!)
+    // ==========================================
+    // 2. CHILD-SIDE FOREIGN KEY VALIDATION
+    // ==========================================
+    for (const auto &fk : table_info_->foreign_keys_) {
+      Value new_child_val = new_tuple.GetValue(schema, fk.child_key_attrs_[0]);
+      Value old_child_val =
+          current_old_tuple.GetValue(schema, fk.child_key_attrs_[0]);
+
+      if (new_child_val.CompareEquals(old_child_val))
+        continue; // Unchanged FK column, skip lookup
+
+      TableMetadata *parent_meta = catalog->GetTable(fk.parent_table_oid_);
+      if (!parent_meta) {
+        throw std::runtime_error("Foreign Key Error: Parent table lost.");
+      }
+
+      bool found_parent = false;
+      auto parent_indexes = catalog->GetTableIndexes(parent_meta->oid_);
+      IndexMetadata *pk_index = nullptr;
+      for (auto *idx : parent_indexes) {
+        if (idx->key_attrs_ == fk.parent_key_attrs_) {
+          pk_index = idx;
+          break;
+        }
+      }
+
+      if (pk_index) {
+        std::vector<Column> p_key_cols = {
+            parent_meta->schema_.GetColumn(fk.parent_key_attrs_[0])};
+        Schema p_key_schema(p_key_cols);
+        Tuple search_key(std::vector<Value>{new_child_val}, &p_key_schema);
+        std::vector<RID> p_rids;
+        pk_index->index_->ScanKey(search_key, &p_rids, txn);
+        found_parent = !p_rids.empty();
+      } else {
+        auto p_iter = parent_meta->table_->Begin(txn);
+        while (p_iter != parent_meta->table_->End()) {
+          Tuple p_tuple;
+          if (parent_meta->table_->GetTuple(p_iter.GetRid(), &p_tuple, txn)) {
+            Value p_val = p_tuple.GetValue(&parent_meta->schema_,
+                                           fk.parent_key_attrs_[0]);
+            if (p_val.CompareEquals(new_child_val)) {
+              found_parent = true;
+              break;
+            }
+          }
+          ++p_iter;
+        }
+      }
+
+      if (!found_parent) {
+        throw std::runtime_error(
+            "Constraint Violation: Foreign key '" + fk.fk_name_ +
+            "' referenced value does not exist in parent table '" +
+            parent_meta->name_ + "'.");
+      }
+    }
+
+    // ==========================================
+    // 3. PARENT-SIDE CASCADE/RESTRICT LOGIC
+    // ==========================================
+    FKConstraintHandler::EnforceOnUpdate(current_old_tuple, new_tuple,
+                                         table_info_, catalog, txn,
+                                         acquire_write_lock);
 
     // ==========================================
     // 4. PHYSICAL UPDATE & LOGGING OF TARGET ROW

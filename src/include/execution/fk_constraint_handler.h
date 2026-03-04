@@ -22,6 +22,14 @@ public:
                               TableMetadata *parent_table, Catalog *catalog,
                               Transaction *txn,
                               const WriteLockFn &acquire_write_lock);
+
+  // Enforce ON UPDATE constraints for all child tables referencing
+  // parent_table. Handles RESTRICT (throws), CASCADE (updates children),
+  // SET_NULL (nullifies FK column).
+  static void EnforceOnUpdate(const Tuple &old_tuple, const Tuple &new_tuple,
+                              TableMetadata *parent_table, Catalog *catalog,
+                              Transaction *txn,
+                              const WriteLockFn &acquire_write_lock);
 };
 
 } // namespace tetodb
