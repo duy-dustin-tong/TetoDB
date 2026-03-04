@@ -135,10 +135,26 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
     plan_nodes_.push_back(std::move(nlj));
   }
 
+  // ==========================================
+  // ALIAS RESOLUTION MAP
+  // ==========================================
+  std::unordered_map<std::string, std::string> alias_map;
+  for (const auto &expr_ast : stmt->select_list_) {
+    if (expr_ast->type_ == ASTNodeType::COLUMN_REF) {
+      const auto *col_ref = static_cast<const ColumnRefExpr *>(expr_ast.get());
+      if (!col_ref->alias_.empty())
+        alias_map[col_ref->alias_] = col_ref->col_name_;
+    } else if (expr_ast->type_ == ASTNodeType::AGGREGATE) {
+      const auto *agg_expr = static_cast<const AggregateExpr *>(expr_ast.get());
+      if (!agg_expr->alias_.empty())
+        alias_map[agg_expr->alias_] = agg_expr->func_name_;
+    }
+  }
+
   // --- THE WHERE CLAUSE FILTER ---
   if (stmt->where_clause_) {
     auto filter_expr =
-        PlanExpression(stmt->where_clause_.get(), current_schema);
+        PlanExpression(stmt->where_clause_.get(), current_schema, alias_map);
     const AbstractExpression *predicate_ptr = filter_expr.get();
     expressions_.push_back(std::move(filter_expr));
 
@@ -162,7 +178,7 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
     std::vector<Column> agg_out_cols;
 
     for (const auto &gb_ast : stmt->group_bys_) {
-      auto gb_expr = PlanExpression(gb_ast.get(), current_schema);
+      auto gb_expr = PlanExpression(gb_ast.get(), current_schema, alias_map);
       if (gb_ast->type_ == ASTNodeType::COLUMN_REF) {
         std::string col_name =
             static_cast<const ColumnRefExpr *>(gb_ast.get())->col_name_;
@@ -187,7 +203,8 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
       if (expr_ast->type_ == ASTNodeType::AGGREGATE) {
         const auto *agg_ast =
             static_cast<const AggregateExpr *>(expr_ast.get());
-        auto arg_expr = PlanExpression(agg_ast->arg_.get(), current_schema);
+        auto arg_expr =
+            PlanExpression(agg_ast->arg_.get(), current_schema, alias_map);
 
         auto it = agg_map.find(agg_ast->func_name_);
         if (it == agg_map.end())
@@ -219,20 +236,23 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
     plan_nodes_.push_back(std::move(agg_plan));
   }
 
-  // ==========================================
-  // ALIAS RESOLUTION MAP
-  // ==========================================
-  std::unordered_map<std::string, std::string> alias_map;
-  for (const auto &expr_ast : stmt->select_list_) {
-    if (expr_ast->type_ == ASTNodeType::COLUMN_REF) {
-      const auto *col_ref = static_cast<const ColumnRefExpr *>(expr_ast.get());
-      if (!col_ref->alias_.empty())
-        alias_map[col_ref->alias_] = col_ref->col_name_;
-    } else if (expr_ast->type_ == ASTNodeType::AGGREGATE) {
-      const auto *agg_expr = static_cast<const AggregateExpr *>(expr_ast.get());
-      if (!agg_expr->alias_.empty())
-        alias_map[agg_expr->alias_] = agg_expr->func_name_;
+  // --- THE HAVING FILTER ---
+  if (stmt->having_clause_) {
+    // We cannot have HAVING without Aggregation.
+    if (!has_aggregation) {
+      throw std::runtime_error(
+          "Planner Error: HAVING requires GROUP BY or Aggregation functions");
     }
+
+    auto filter_expr =
+        PlanExpression(stmt->having_clause_.get(), current_schema, alias_map);
+    const AbstractExpression *predicate_ptr = filter_expr.get();
+    expressions_.push_back(std::move(filter_expr));
+
+    auto filter_plan = std::make_unique<FilterPlanNode>(
+        current_schema, current_plan, predicate_ptr);
+    current_plan = filter_plan.get();
+    plan_nodes_.push_back(std::move(filter_plan));
   }
 
   // --- THE ORDER BY SORTING ---
@@ -481,6 +501,11 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
   if (const auto *col_ref = dynamic_cast<const ColumnRefExpr *>(ast_expr)) {
     std::string target_col = col_ref->col_name_;
 
+    if (target_col == "*") {
+      return std::make_unique<ConstantValueExpression>(
+          Value(TypeId::INTEGER, 1));
+    }
+
     if (alias_map.find(target_col) != alias_map.end()) {
       target_col = alias_map.at(target_col);
     }
@@ -543,11 +568,17 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
   }
 
   if (const auto *agg_expr = dynamic_cast<const AggregateExpr *>(ast_expr)) {
-    uint32_t col_idx = schema->GetColIdx(agg_expr->func_name_);
+    std::string target_name = agg_expr->func_name_;
+    if (alias_map.find(agg_expr->alias_) != alias_map.end()) {
+      target_name = alias_map.at(agg_expr->alias_);
+    }
+
+    uint32_t col_idx = schema->GetColIdx(target_name);
     if (col_idx == static_cast<uint32_t>(-1))
-      throw std::runtime_error("Planner Error: Aggregate '" +
-                               agg_expr->func_name_ + "' not found in schema.");
-    return std::make_unique<ColumnValueExpression>(0, col_idx);
+      throw std::runtime_error("Planner Error: Aggregate '" + target_name +
+                               "' not found in schema.");
+    TypeId return_type = schema->GetColumn(col_idx).GetTypeId();
+    return std::make_unique<ColumnValueExpression>(0, col_idx, return_type);
   }
 
   if (const auto *bin_expr = dynamic_cast<const BinaryExpr *>(ast_expr)) {

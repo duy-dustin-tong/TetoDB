@@ -306,6 +306,7 @@ struct SelectStatement : public ASTNode {
   std::vector<std::unique_ptr<JoinNode>> joins_;
   std::unique_ptr<Expr> where_clause_;
   std::vector<std::unique_ptr<Expr>> group_bys_;
+  std::unique_ptr<Expr> having_clause_;
   std::vector<std::unique_ptr<OrderByNode>> order_bys_;
 
   bool is_distinct_{false};

@@ -402,6 +402,10 @@ std::unique_ptr<SelectStatement> Parser::ParseSelect() {
     } while (Match(TokenType::SYMBOL, ","));
   }
 
+  if (Match(TokenType::KEYWORD, "HAVING")) {
+    stmt->having_clause_ = ParseExpression();
+  }
+
   if (Match(TokenType::KEYWORD, "ORDER")) {
     Consume(TokenType::KEYWORD, "Expected 'BY' after 'ORDER'");
 
@@ -579,6 +583,10 @@ std::unique_ptr<Expr> Parser::ParseBaseExpression() {
   }
   if (Match(TokenType::KEYWORD, "FALSE")) {
     return std::make_unique<ConstantExpr>("FALSE");
+  }
+
+  if (Match(TokenType::SYMBOL, "*")) {
+    return std::make_unique<ColumnRefExpr>("", "*");
   }
 
   if (Match(TokenType::NUMBER)) {
