@@ -51,6 +51,8 @@ enum class ReferentialAction {
   SET_NULL  // Set child columns to NULL (if supported by schema)
 };
 
+struct SelectStatement;
+
 // Base Tree Node
 struct ASTNode {
   ASTNodeType type_;
@@ -208,10 +210,13 @@ struct InExpr : public Expr {
   std::unique_ptr<Expr> left_;
   std::vector<std::unique_ptr<Expr>> in_list_;
   bool is_not_;
+  std::unique_ptr<SelectStatement> subquery_;
 
   InExpr(std::unique_ptr<Expr> l, std::vector<std::unique_ptr<Expr>> list,
-         bool is_not = false)
-      : left_(std::move(l)), in_list_(std::move(list)), is_not_(is_not) {
+         bool is_not = false,
+         std::unique_ptr<SelectStatement> subquery = nullptr)
+      : left_(std::move(l)), in_list_(std::move(list)), is_not_(is_not),
+        subquery_(std::move(subquery)) {
     type_ = ASTNodeType::IN_EXPR;
   }
 
@@ -219,9 +224,15 @@ struct InExpr : public Expr {
     std::string res =
         Indent(indent) + "[InExpr" + (is_not_ ? " NOT" : "") + "]\n";
     res += left_->ToString(indent + 1);
-    res += Indent(indent + 1) + "- IN LIST:\n";
-    for (const auto &expr : in_list_) {
-      res += expr->ToString(indent + 2);
+    if (subquery_) {
+      res += Indent(indent + 1) + "- IN SUBQUERY:\n";
+      res += reinterpret_cast<const ASTNode *>(subquery_.get())
+                 ->ToString(indent + 2);
+    } else {
+      res += Indent(indent + 1) + "- IN LIST:\n";
+      for (const auto &expr : in_list_) {
+        res += expr->ToString(indent + 2);
+      }
     }
     return res;
   }
@@ -255,15 +266,21 @@ struct BetweenExpr : public Expr {
 struct TableRef : public ASTNode {
   std::string table_name_;
   std::string alias_;
+  std::unique_ptr<SelectStatement> subquery_;
 
-  TableRef(std::string name, std::string alias)
-      : table_name_(name), alias_(alias) {
+  TableRef(std::string name, std::string alias,
+           std::unique_ptr<SelectStatement> subquery = nullptr)
+      : table_name_(name), alias_(alias), subquery_(std::move(subquery)) {
     type_ = ASTNodeType::TABLE_REF;
   }
 
   std::string ToString(int indent = 0) const override {
-    // Changed from "(Alias: x)" to "AS x" for 100% uniformity
     std::string a = alias_.empty() ? "" : " AS " + alias_;
+    if (subquery_) {
+      return Indent(indent) + "[TableRef Subquery" + a + "]\n" +
+             reinterpret_cast<const ASTNode *>(subquery_.get())
+                 ->ToString(indent + 1);
+    }
     return Indent(indent) + "[TableRef: " + table_name_ + a + "]\n";
   }
 };
@@ -341,8 +358,17 @@ struct FunctionExpr : public Expr {
   }
 };
 
+struct CTE {
+  std::string alias_;
+  std::unique_ptr<SelectStatement> query_;
+
+  CTE(std::string alias, std::unique_ptr<SelectStatement> query)
+      : alias_(std::move(alias)), query_(std::move(query)) {}
+};
+
 // The Root Node: SELECT ... FROM ... WHERE ...
 struct SelectStatement : public ASTNode {
+  std::vector<std::unique_ptr<CTE>> ctes_;
   std::vector<std::unique_ptr<Expr>> select_list_;
   std::unique_ptr<TableRef> from_table_;
   std::vector<std::unique_ptr<JoinNode>> joins_;
@@ -360,6 +386,13 @@ struct SelectStatement : public ASTNode {
 
   std::string ToString(int indent = 0) const override {
     std::string res = Indent(indent) + "[[ SELECT STATEMENT ]]\n";
+    if (!ctes_.empty()) {
+      res += Indent(indent + 1) + "- WITH:\n";
+      for (const auto &cte : ctes_) {
+        res += Indent(indent + 2) + "[CTE: " + cte->alias_ + "]\n";
+        res += cte->query_->ToString(indent + 3);
+      }
+    }
     res += Indent(indent + 1) + "- SELECT:\n";
     for (const auto &expr : select_list_)
       res += expr->ToString(indent + 2);

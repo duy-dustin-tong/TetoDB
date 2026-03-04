@@ -22,7 +22,7 @@ std::unique_ptr<ASTNode> Parser::ParseStatement() {
     return std::make_unique<ExplainStatement>(std::move(inner_stmt));
   }
 
-  if (Peek().value_ == "SELECT") {
+  if (Peek().value_ == "SELECT" || Peek().value_ == "WITH") {
     std::unique_ptr<ASTNode> left_stmt = ParseSelect();
 
     while (cursor_ < tokens_.size() && Peek().type_ == TokenType::KEYWORD &&
@@ -284,6 +284,13 @@ std::unique_ptr<CreateTableStatement> Parser::ParseCreateTable() {
               "Expected column data type (e.g., INT, VARCHAR)");
       std::string col_type = tokens_[cursor_ - 1].value_;
 
+      if (Match(TokenType::SYMBOL, "(")) {
+        if (Peek().type_ == TokenType::NUMBER) {
+          Advance();
+        }
+        Match(TokenType::SYMBOL, ")");
+      }
+
       ColumnDef col(col_name, col_type);
 
       if (Match(TokenType::KEYWORD, "PRIMARY")) {
@@ -381,6 +388,19 @@ std::unique_ptr<CreateIndexStatement> Parser::ParseCreateIndex() {
 
 std::unique_ptr<SelectStatement> Parser::ParseSelect() {
   auto stmt = std::make_unique<SelectStatement>();
+
+  if (Match(TokenType::KEYWORD, "WITH")) {
+    do {
+      Consume(TokenType::IDENTIFIER, "Expected CTE alias");
+      std::string cte_alias = tokens_[cursor_ - 1].value_;
+      Consume(TokenType::KEYWORD, "AS");
+      Consume(TokenType::SYMBOL, "(");
+      auto cte_query = ParseSelect();
+      Consume(TokenType::SYMBOL, ")");
+      stmt->ctes_.push_back(
+          std::make_unique<CTE>(cte_alias, std::move(cte_query)));
+    } while (Match(TokenType::SYMBOL, ","));
+  }
 
   Consume(TokenType::KEYWORD, "Expected SELECT");
   if (tokens_[cursor_ - 1].value_ != "SELECT") {
@@ -570,6 +590,16 @@ std::unique_ptr<Expr> Parser::ParseComparisonExpression() {
   if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "IN") {
     Advance();
     Consume(TokenType::SYMBOL, "(");
+
+    if (Peek().type_ == TokenType::KEYWORD &&
+        (Peek().value_ == "SELECT" || Peek().value_ == "WITH")) {
+      auto subquery = ParseSelect();
+      Consume(TokenType::SYMBOL, ")");
+      return std::make_unique<InExpr>(std::move(left),
+                                      std::vector<std::unique_ptr<Expr>>(),
+                                      is_not, std::move(subquery));
+    }
+
     std::vector<std::unique_ptr<Expr>> in_list;
     do {
       in_list.push_back(ParseExpression());
@@ -698,6 +728,19 @@ std::unique_ptr<Expr> Parser::ParseBaseExpression() {
 }
 
 std::unique_ptr<TableRef> Parser::ParseTableRef() {
+  if (Match(TokenType::SYMBOL, "(")) {
+    auto subquery = ParseSelect();
+    Consume(TokenType::SYMBOL, ")");
+    std::string alias = "";
+    if (Match(TokenType::KEYWORD, "AS")) {
+      Consume(TokenType::IDENTIFIER, "Expected alias after AS for subquery");
+      alias = tokens_[cursor_ - 1].value_;
+    } else if (Peek().type_ == TokenType::IDENTIFIER) {
+      alias = Advance().value_;
+    }
+    return std::make_unique<TableRef>("", alias, std::move(subquery));
+  }
+
   Consume(TokenType::IDENTIFIER, "Expected table name");
   std::string table_name = tokens_[cursor_ - 1].value_;
   std::string alias = "";

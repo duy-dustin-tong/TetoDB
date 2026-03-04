@@ -3,6 +3,7 @@
 // planner.cpp
 
 #include "planner/planner.h"
+#include "execution/execution_engine.h"
 #include "execution/expressions/column_value_expression.h"
 #include "execution/expressions/comparison_expression.h"
 #include "execution/expressions/constant_value_expression.h"
@@ -41,46 +42,82 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
     throw std::runtime_error("Planner Error: SELECT must have a FROM clause");
   }
 
-  std::string left_table_name = stmt->from_table_->table_name_;
-  TableMetadata *left_meta = catalog_->GetTable(left_table_name);
-  if (!left_meta)
-    throw std::runtime_error("Planner Error: Table '" + left_table_name +
-                             "' not found.");
+  const AbstractPlanNode *current_plan = nullptr;
+  const Schema *current_schema = nullptr;
 
-  // --- STORE LEFT ALIAS CONTEXT ---
-  active_left_alias_ = stmt->from_table_->alias_.empty()
-                           ? left_table_name
-                           : stmt->from_table_->alias_;
-  active_left_schema_ = &left_meta->schema_;
-  active_right_alias_ = "";
-  active_right_schema_ = nullptr;
+  // --- CACHE CTES ---
+  for (const auto &cte : stmt->ctes_) {
+    cte_map_[cte->alias_] = cte->query_.get();
+  }
 
-  auto left_scan =
-      std::make_unique<SeqScanPlanNode>(&left_meta->schema_, left_meta->oid_);
-  const AbstractPlanNode *current_plan = left_scan.get();
-  const Schema *current_schema = &left_meta->schema_;
-  plan_nodes_.push_back(std::move(left_scan));
+  if (stmt->from_table_->subquery_) {
+    current_plan = PlanSelect(stmt->from_table_->subquery_.get());
+    current_schema = current_plan->OutputSchema();
+    active_left_alias_ = stmt->from_table_->alias_;
+    active_left_schema_ = current_schema;
+  } else if (cte_map_.count(stmt->from_table_->table_name_)) {
+    current_plan = PlanSelect(cte_map_[stmt->from_table_->table_name_]);
+    current_schema = current_plan->OutputSchema();
+    active_left_alias_ = stmt->from_table_->alias_.empty()
+                             ? stmt->from_table_->table_name_
+                             : stmt->from_table_->alias_;
+    active_left_schema_ = current_schema;
+  } else {
+    std::string left_table_name = stmt->from_table_->table_name_;
+    TableMetadata *left_meta = catalog_->GetTable(left_table_name);
+    if (!left_meta)
+      throw std::runtime_error("Planner Error: Table '" + left_table_name +
+                               "' not found.");
+
+    active_left_alias_ = stmt->from_table_->alias_.empty()
+                             ? left_table_name
+                             : stmt->from_table_->alias_;
+    active_left_schema_ = &left_meta->schema_;
+
+    auto left_scan =
+        std::make_unique<SeqScanPlanNode>(&left_meta->schema_, left_meta->oid_);
+    current_plan = left_scan.get();
+    current_schema = &left_meta->schema_;
+    plan_nodes_.push_back(std::move(left_scan));
+  }
 
   // --- JOINS ---
   for (const auto &join_stmt : stmt->joins_) {
     const auto *join_ast = join_stmt.get();
 
-    std::string right_table_name = join_ast->right_table_->table_name_;
-    TableMetadata *right_meta = catalog_->GetTable(right_table_name);
-    if (!right_meta)
-      throw std::runtime_error("Planner Error: Table '" + right_table_name +
-                               "' not found.");
+    const AbstractPlanNode *right_scan_ptr = nullptr;
+    const Schema *right_schema = nullptr;
 
-    // --- STORE RIGHT ALIAS CONTEXT ---
-    active_right_alias_ = join_ast->right_table_->alias_.empty()
-                              ? right_table_name
-                              : join_ast->right_table_->alias_;
-    active_right_schema_ = &right_meta->schema_;
+    if (join_ast->right_table_->subquery_) {
+      right_scan_ptr = PlanSelect(join_ast->right_table_->subquery_.get());
+      right_schema = right_scan_ptr->OutputSchema();
+      active_right_alias_ = join_ast->right_table_->alias_;
+    } else if (cte_map_.count(join_ast->right_table_->table_name_)) {
+      right_scan_ptr =
+          PlanSelect(cte_map_[join_ast->right_table_->table_name_]);
+      right_schema = right_scan_ptr->OutputSchema();
+      active_right_alias_ = join_ast->right_table_->alias_.empty()
+                                ? join_ast->right_table_->table_name_
+                                : join_ast->right_table_->alias_;
+    } else {
+      std::string right_table_name = join_ast->right_table_->table_name_;
+      TableMetadata *right_meta = catalog_->GetTable(right_table_name);
+      if (!right_meta)
+        throw std::runtime_error("Planner Error: Table '" + right_table_name +
+                                 "' not found.");
 
-    auto right_scan = std::make_unique<SeqScanPlanNode>(&right_meta->schema_,
-                                                        right_meta->oid_);
-    const AbstractPlanNode *right_scan_ptr = right_scan.get();
-    plan_nodes_.push_back(std::move(right_scan));
+      active_right_alias_ = join_ast->right_table_->alias_.empty()
+                                ? right_table_name
+                                : join_ast->right_table_->alias_;
+      right_schema = &right_meta->schema_;
+
+      auto right_scan = std::make_unique<SeqScanPlanNode>(&right_meta->schema_,
+                                                          right_meta->oid_);
+      right_scan_ptr = right_scan.get();
+      plan_nodes_.push_back(std::move(right_scan));
+    }
+
+    active_right_schema_ = right_schema;
 
     if (join_ast->condition_->type_ != ASTNodeType::BINARY_EXPR) {
       throw std::runtime_error(
@@ -96,8 +133,7 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
 
     uint32_t left_col_idx = current_schema->GetColIdx(
         left_col_ast->col_name_); // Use current_schema
-    uint32_t right_col_idx =
-        right_meta->schema_.GetColIdx(right_col_ast->col_name_);
+    uint32_t right_col_idx = right_schema->GetColIdx(right_col_ast->col_name_);
 
     auto left_key_expr =
         std::make_unique<ColumnValueExpression>(0, left_col_idx);
@@ -125,7 +161,7 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
 
     std::vector<Column> joined_cols =
         current_schema->GetColumns(); // Use current_schema
-    for (const auto &col : right_meta->schema_.GetColumns()) {
+    for (const auto &col : right_schema->GetColumns()) {
       joined_cols.push_back(col);
     }
     auto joined_schema = std::make_unique<Schema>(joined_cols);
@@ -646,9 +682,24 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
   if (const auto *in_expr = dynamic_cast<const InExpr *>(ast_expr)) {
     auto left = PlanExpression(in_expr->left_.get(), schema, alias_map);
     std::vector<std::unique_ptr<AbstractExpression>> list;
-    for (const auto &item : in_expr->in_list_) {
-      list.push_back(PlanExpression(item.get(), schema, alias_map));
+
+    if (in_expr->subquery_) {
+      const AbstractPlanNode *subplan = PlanSelect(in_expr->subquery_.get());
+      auto executor = ExecutionEngine::CreateExecutor(subplan, exec_ctx_);
+      executor->Init();
+
+      Tuple tuple;
+      RID rid;
+      while (executor->Next(&tuple, &rid)) {
+        Value val = tuple.GetValue(subplan->OutputSchema(), 0);
+        list.push_back(std::make_unique<ConstantValueExpression>(val));
+      }
+    } else {
+      for (const auto &item : in_expr->in_list_) {
+        list.push_back(PlanExpression(item.get(), schema, alias_map));
+      }
     }
+
     return std::make_unique<InExpression>(std::move(left), std::move(list),
                                           in_expr->is_not_);
   }

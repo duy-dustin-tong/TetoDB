@@ -22,7 +22,7 @@ const std::unordered_set<std::string> Lexer::keywords_ = {
     "DESC",      "HAVING",     "AVERAGE",    "MED",     "MEDIAN",
     "BETWEEN",   "IN",         "UPPER",      "LOWER",   "LENGTH",
     "CONCAT",    "SUBSTRING",  "DISTINCT",   "UNION",   "INTERSECT",
-    "EXCEPT"};
+    "EXCEPT",    "WITH"};
 
 Lexer::Lexer(const std::string &input) : input_(input), cursor_(0) {}
 

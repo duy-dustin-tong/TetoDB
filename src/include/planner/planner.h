@@ -56,6 +56,9 @@ private:
   const Schema *active_left_schema_ = nullptr;
   const Schema *active_right_schema_ = nullptr;
 
+  // --- NEW: CTE Tracking ---
+  std::unordered_map<std::string, const SelectStatement *> cte_map_;
+
   // --- Memory Arenas (deque guarantees pointer stability on push_back) ---
   std::deque<std::unique_ptr<AbstractExpression>> expressions_;
   std::deque<std::unique_ptr<Schema>> schemas_;
