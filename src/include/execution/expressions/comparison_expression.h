@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <vector>
 
-
 #include "execution/expressions/abstract_expression.h"
 #include "type/value.h"
 
@@ -20,7 +19,9 @@ enum class CompType {
   LESS_THAN_OR_EQUAL,
   GREATER_THAN_OR_EQUAL,
   IS_NULL,
-  IS_NOT_NULL
+  IS_NOT_NULL,
+  LIKE,
+  ILIKE
 };
 
 class ComparisonExpression : public AbstractExpression {
@@ -90,6 +91,12 @@ private:
       break;
     case CompType::IS_NOT_NULL:
       result = !lhs.IsNull();
+      break;
+    case CompType::LIKE:
+      result = lhs.CompareLike(rhs);
+      break;
+    case CompType::ILIKE:
+      result = lhs.CompareILike(rhs);
       break;
     default:
       throw std::runtime_error("Unknown Comparison Type!");

@@ -14,7 +14,6 @@
 #include "execution/plans/sort_plan.h"
 #include <unordered_map>
 
-
 namespace tetodb {
 
 // --- UPDATED: Take raw pointer ---
@@ -563,7 +562,9 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
         {">=", CompType::GREATER_THAN_OR_EQUAL},
         {"!=", CompType::NOT_EQUAL},
         {"IS_NULL", CompType::IS_NULL},
-        {"IS_NOT_NULL", CompType::IS_NOT_NULL}};
+        {"IS_NOT_NULL", CompType::IS_NOT_NULL},
+        {"LIKE", CompType::LIKE},
+        {"ILIKE", CompType::ILIKE}};
     auto it = comp_map.find(bin_expr->op_);
     if (it == comp_map.end())
       throw std::runtime_error("Planner Error: Unsupported operator '" +

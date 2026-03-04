@@ -460,6 +460,31 @@ std::unique_ptr<Expr> Parser::ParseComparisonExpression() {
     left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
   }
 
+  // Handle [NOT] LIKE and [NOT] ILIKE
+  bool is_not_like = false;
+  if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "NOT") {
+    // We only consume "NOT" if the NEXT token is LIKE or ILIKE or IN or
+    // BETWEEN. If it's something else, we let the lower block handle it or
+    // throw.
+    if (Peek(1).type_ == TokenType::KEYWORD &&
+        (Peek(1).value_ == "LIKE" || Peek(1).value_ == "ILIKE")) {
+      is_not_like = true;
+      Advance(); // Consume NOT
+    }
+  }
+
+  if (Peek().type_ == TokenType::KEYWORD &&
+      (Peek().value_ == "LIKE" || Peek().value_ == "ILIKE")) {
+    std::string op = Advance().value_;
+    auto right = ParseBaseExpression();
+    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
+
+    if (is_not_like) {
+      // Wrap it in a logical NOT expression
+      left = std::make_unique<NotExpr>(std::move(left));
+    }
+  }
+
   if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "IS") {
     Advance();
     std::string op = "IS_NULL";

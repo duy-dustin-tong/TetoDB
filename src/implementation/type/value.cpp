@@ -1,6 +1,7 @@
 // value.cpp
 
 #include "type/value.h"
+#include <regex>
 #include <stdexcept>
 
 namespace tetodb {
@@ -331,6 +332,84 @@ bool Value::CompareGreaterThan(const Value &other) const {
   }
 
   return false;
+}
+
+static std::string SqlLikeToRegex(const std::string &sql_pattern) {
+  std::string regex_str = "^";
+  for (char c : sql_pattern) {
+    switch (c) {
+    case '%':
+      regex_str += ".*";
+      break;
+    case '_':
+      regex_str += ".";
+      break;
+    case '\\':
+    case '^':
+    case '$':
+    case '.':
+    case '|':
+    case '?':
+    case '*':
+    case '+':
+    case '(':
+    case ')':
+    case '[':
+    case ']':
+    case '{':
+    case '}':
+      regex_str += "\\";
+      regex_str += c;
+      break;
+    default:
+      regex_str += c;
+      break;
+    }
+  }
+  regex_str += "$";
+  return regex_str;
+}
+
+bool Value::CompareLike(const Value &other) const {
+  if (is_null_ || other.is_null_)
+    return false;
+  if (type_id_ != TypeId::VARCHAR && type_id_ != TypeId::CHAR) {
+    throw std::runtime_error(
+        "LIKE operator requires a string on the left side.");
+  }
+  if (other.type_id_ != TypeId::VARCHAR && other.type_id_ != TypeId::CHAR) {
+    throw std::runtime_error(
+        "LIKE operator requires a string on the right side.");
+  }
+
+  std::string regex_str = SqlLikeToRegex(other.str_value_);
+  try {
+    std::regex pattern(regex_str);
+    return std::regex_match(str_value_, pattern);
+  } catch (const std::regex_error &e) {
+    throw std::runtime_error("Invalid LIKE pattern: " + other.str_value_);
+  }
+}
+
+bool Value::CompareILike(const Value &other) const {
+  if (is_null_ || other.is_null_)
+    return false;
+  if (type_id_ != TypeId::VARCHAR && type_id_ != TypeId::CHAR) {
+    throw std::runtime_error(
+        "ILIKE operator requires a string on the left side.");
+  }
+  if (other.type_id_ != TypeId::VARCHAR && other.type_id_ != TypeId::CHAR) {
+    throw std::runtime_error(
+        "ILIKE operator requires a string on the right side.");
+  }
+
+  std::string regex_str = SqlLikeToRegex(other.str_value_);
+  try {
+    std::regex pattern(regex_str, std::regex_constants::icase);
+    return std::regex_match(str_value_, pattern);
+  } catch (const std::regex_error &e) {
+    throw std::runtime_error("Invalid ILIKE pattern: " + other.str_value_);
+  }
 }
 
 // ==========================================================
