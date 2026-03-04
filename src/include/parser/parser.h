@@ -8,7 +8,6 @@
 #include <stdexcept>
 #include <vector>
 
-
 namespace tetodb {
 
 class Parser {
@@ -39,6 +38,7 @@ private:
   std::unique_ptr<CreateTableStatement> ParseCreateTable();
   std::unique_ptr<CreateIndexStatement> ParseCreateIndex();
   std::unique_ptr<DropTableStatement> ParseDropTable(); // <-- ADDED
+  std::unique_ptr<DropIndexStatement> ParseDropIndex();
 
   // --- Token Helpers ---
   const Token &Peek(int offset = 0) const;

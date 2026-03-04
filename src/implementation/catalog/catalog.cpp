@@ -388,6 +388,37 @@ bool Catalog::DropTable(const std::string &table_name) {
   return true;
 }
 
+bool Catalog::DropIndex(const std::string &index_name) {
+  std::unique_lock<std::mutex> lock(latch_);
+
+  auto it = index_names_.find(index_name);
+  if (it == index_names_.end())
+    return false;
+
+  index_oid_t index_oid = it->second;
+  IndexMetadata *index_meta = indexes_[index_oid].get();
+  table_oid_t table_oid = index_meta->table_oid_;
+
+  // Destruct index from disk/heap mappings
+  index_meta->index_->Destroy();
+
+  // Remove from table_indexes mapping
+  auto &table_idx_list = table_indexes_[table_oid];
+  table_idx_list.erase(
+      std::remove(table_idx_list.begin(), table_idx_list.end(), index_meta),
+      table_idx_list.end());
+
+  // Remove from master maps
+  indexes_.erase(index_oid);
+  index_names_.erase(index_name);
+
+  lock.unlock();
+
+  SaveCatalog(catalog_path_);
+
+  return true;
+}
+
 void Catalog::SaveCatalog(const std::string &file_path) {
   std::lock_guard<std::mutex> lock(latch_);
   std::ofstream out(file_path);

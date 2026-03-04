@@ -291,6 +291,13 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
         res.status_msg = "DROP TABLE";
       else
         throw std::runtime_error("Table not found");
+    } else if (ast->type_ == ASTNodeType::DROP_INDEX_STATEMENT) {
+      std::unique_lock<std::shared_mutex> ddl_lock(ddl_latch_);
+      auto *d_stmt = static_cast<DropIndexStatement *>(ast.get());
+      if (catalog_->DropIndex(d_stmt->index_name_))
+        res.status_msg = "DROP INDEX";
+      else
+        throw std::runtime_error("Index not found");
     }
     // 3. DML/Query Logic
     else {

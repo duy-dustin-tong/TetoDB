@@ -18,6 +18,7 @@ enum class ASTNodeType {
   CREATE_TABLE_STATEMENT,
   CREATE_INDEX_STATEMENT,
   DROP_TABLE_STATEMENT,
+  DROP_INDEX_STATEMENT,
   TRANSACTION_STATEMENT,
   EXPLAIN_STATEMENT,
   SAVEPOINT_STATEMENT,
@@ -382,6 +383,18 @@ struct DropTableStatement : public ASTNode {
 
   std::string ToString(int indent = 0) const override {
     return Indent(indent) + "Drop Table: " + table_name_ + "\n";
+  }
+};
+
+struct DropIndexStatement : public ASTNode {
+  std::string index_name_;
+
+  DropIndexStatement(std::string name) : index_name_(std::move(name)) {
+    type_ = ASTNodeType::DROP_INDEX_STATEMENT;
+  }
+
+  std::string ToString(int indent = 0) const override {
+    return Indent(indent) + "Drop Index: " + index_name_ + "\n";
   }
 };
 

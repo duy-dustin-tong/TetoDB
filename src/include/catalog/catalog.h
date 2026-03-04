@@ -123,6 +123,7 @@ public:
   void AddForeignKey(table_oid_t child_table_oid, const ForeignKey &fk);
 
   bool DropTable(const std::string &table_name);
+  bool DropIndex(const std::string &index_name);
 
   void SaveCatalog(const std::string &file_path);
   void LoadCatalog(const std::string &file_path);

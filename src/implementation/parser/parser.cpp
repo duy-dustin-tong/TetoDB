@@ -43,6 +43,8 @@ std::unique_ptr<ASTNode> Parser::ParseStatement() {
   if (Peek().value_ == "DROP") {
     if (Peek(1).value_ == "TABLE")
       return ParseDropTable();
+    if (Peek(1).value_ == "INDEX")
+      return ParseDropIndex();
     throw std::runtime_error("Syntax Error: Unknown DROP statement type");
   }
 
@@ -300,6 +302,21 @@ std::unique_ptr<DropTableStatement> Parser::ParseDropTable() {
   }
 
   return std::make_unique<DropTableStatement>(table_name);
+}
+
+std::unique_ptr<DropIndexStatement> Parser::ParseDropIndex() {
+  Consume(TokenType::KEYWORD, "Expected DROP");
+  Consume(TokenType::KEYWORD, "Expected INDEX");
+
+  Consume(TokenType::IDENTIFIER, "Expected index name");
+  std::string index_name = tokens_[cursor_ - 1].value_;
+
+  // Optional semicolon at the end
+  if (Match(TokenType::SYMBOL, ";")) {
+    // Semicolon consumed
+  }
+
+  return std::make_unique<DropIndexStatement>(index_name);
 }
 
 std::unique_ptr<CreateIndexStatement> Parser::ParseCreateIndex() {
