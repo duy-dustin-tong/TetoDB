@@ -63,6 +63,8 @@ public:
     return PerformComputation(lhs, rhs);
   }
 
+  TypeId GetReturnType() const override { return TypeId::BOOLEAN; }
+
 private:
   Value PerformComputation(const Value &lhs, const Value &rhs) const {
     bool result = false;

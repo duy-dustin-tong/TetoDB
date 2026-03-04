@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-
 #include "execution/expressions/abstract_expression.h"
 #include "type/value.h"
 
@@ -108,6 +107,8 @@ public:
       return Value(TypeId::BOOLEAN, lhs.GetAsBoolean() || rhs.GetAsBoolean());
     }
   }
+
+  TypeId GetReturnType() const override { return TypeId::BOOLEAN; }
 
 private:
   LogicType logic_type_;

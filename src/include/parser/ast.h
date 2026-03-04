@@ -31,6 +31,7 @@ enum class ASTNodeType {
   NOT_EXPR,
   IN_EXPR,
   BETWEEN_EXPR,
+  FUNCTION_EXPR,
   TABLE_REF,
   JOIN,
   ORDER_BY,
@@ -274,6 +275,26 @@ struct AggregateExpr : public Expr {
     std::string alias_suffix = alias_.empty() ? "" : " AS " + alias_;
     return Indent(indent) + "[Aggregate: " + func_name_ + "]" + alias_suffix +
            "\n" + arg_->ToString(indent + 1);
+  }
+};
+
+// E.g., UPPER(name), SUBSTRING(title, 1, 5)
+struct FunctionExpr : public Expr {
+  std::string func_name_;
+  std::vector<std::unique_ptr<Expr>> args_;
+
+  FunctionExpr(std::string func_name, std::vector<std::unique_ptr<Expr>> args)
+      : func_name_(func_name), args_(std::move(args)) {
+    type_ = ASTNodeType::FUNCTION_EXPR;
+  }
+
+  std::string ToString(int indent = 0) const override {
+    std::string res = Indent(indent) + "[Function: " + func_name_ + "]\n";
+    for (size_t i = 0; i < args_.size(); ++i) {
+      res += Indent(indent + 1) + "- Arg " + std::to_string(i + 1) + ":\n";
+      res += args_[i]->ToString(indent + 2);
+    }
+    return res;
   }
 };
 

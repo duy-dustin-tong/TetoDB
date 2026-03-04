@@ -592,6 +592,32 @@ std::unique_ptr<Expr> Parser::ParseBaseExpression() {
     return std::make_unique<AggregateExpr>(upper_val, std::move(arg));
   }
 
+  // Parse Scalar String Functions
+  if (Peek().type_ == TokenType::KEYWORD &&
+      (upper_val == "UPPER" || upper_val == "LOWER" || upper_val == "LENGTH" ||
+       upper_val == "CONCAT" || upper_val == "SUBSTRING")) {
+    Advance();
+
+    if (!Match(TokenType::SYMBOL, "(")) {
+      throw std::runtime_error(
+          "Syntax Error: Expected '(' after function name");
+    }
+
+    std::vector<std::unique_ptr<Expr>> args;
+    if (Peek().type_ != TokenType::SYMBOL || Peek().value_ != ")") {
+      do {
+        args.push_back(ParseExpression());
+      } while (Match(TokenType::SYMBOL, ","));
+    }
+
+    if (!Match(TokenType::SYMBOL, ")")) {
+      throw std::runtime_error(
+          "Syntax Error: Expected ')' after function arguments");
+    }
+
+    return std::make_unique<FunctionExpr>(upper_val, std::move(args));
+  }
+
   if (Match(TokenType::IDENTIFIER)) {
     std::string part1 = tokens_[cursor_ - 1].value_;
 

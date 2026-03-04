@@ -89,6 +89,8 @@ public:
     return Value(TypeId::BOOLEAN, is_not_ ? true : false);
   }
 
+  TypeId GetReturnType() const override { return TypeId::BOOLEAN; }
+
 private:
   bool is_not_;
 };

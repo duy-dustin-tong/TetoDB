@@ -9,6 +9,7 @@
 #include "execution/expressions/in_expression.h"
 #include "execution/expressions/logic_expression.h"
 #include "execution/expressions/parameter_value_expression.h"
+#include "execution/expressions/string_expression.h"
 #include "execution/plans/aggregation_plan.h"
 #include "execution/plans/limit_plan.h"
 #include "execution/plans/sort_plan.h"
@@ -254,16 +255,10 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
   std::vector<Column> out_columns;
 
   for (const auto &expr_ast : stmt->select_list_) {
-    std::string target_col;
-    std::string alias;
-    uint32_t col_idx = static_cast<uint32_t>(-1);
-
+    // 1. Check for `SELECT *` expansion
     if (expr_ast->type_ == ASTNodeType::COLUMN_REF) {
       const auto *col_ref = static_cast<const ColumnRefExpr *>(expr_ast.get());
-      target_col = col_ref->col_name_;
-      alias = col_ref->alias_;
-
-      if (target_col == "*") {
+      if (col_ref->col_name_ == "*") {
         for (uint32_t i = 0; i < current_schema->GetColumnCount(); i++) {
           const Column &col = current_schema->GetColumn(i);
           out_columns.push_back(col);
@@ -274,43 +269,39 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
         }
         continue;
       }
+    }
 
-      if (!col_ref->table_alias_.empty()) {
-        if (col_ref->table_alias_ == active_right_alias_ &&
-            active_right_schema_) {
-          uint32_t local_idx = active_right_schema_->GetColIdx(target_col);
-          if (local_idx != static_cast<uint32_t>(-1)) {
-            col_idx = active_left_schema_->GetColumnCount() + local_idx;
-          }
-        } else if (col_ref->table_alias_ == active_left_alias_ &&
-                   active_left_schema_) {
-          col_idx = active_left_schema_->GetColIdx(target_col);
-        }
-      }
+    // 2. Generic Expression Evaluation
+    std::string alias = "";
+    if (expr_ast->type_ == ASTNodeType::COLUMN_REF) {
+      alias = static_cast<const ColumnRefExpr *>(expr_ast.get())->alias_;
     } else if (expr_ast->type_ == ASTNodeType::AGGREGATE) {
-      const auto *agg_expr = static_cast<const AggregateExpr *>(expr_ast.get());
-      target_col = agg_expr->func_name_;
-      alias = agg_expr->alias_;
-    } else {
-      throw std::runtime_error("Planner Error: Only Columns and Aggregates "
-                               "supported in SELECT list");
+      alias = static_cast<const AggregateExpr *>(expr_ast.get())->alias_;
     }
 
-    if (col_idx == static_cast<uint32_t>(-1)) {
-      col_idx = current_schema->GetColIdx(target_col);
+    auto expr = PlanExpression(expr_ast.get(), current_schema, alias_map);
+    TypeId return_type = expr->GetReturnType();
+
+    // Attempt to formulate a default column name if no alias was provided
+    std::string col_name = alias;
+    if (col_name.empty()) {
+      if (expr_ast->type_ == ASTNodeType::COLUMN_REF) {
+        col_name =
+            static_cast<const ColumnRefExpr *>(expr_ast.get())->col_name_;
+      } else if (expr_ast->type_ == ASTNodeType::AGGREGATE) {
+        col_name =
+            static_cast<const AggregateExpr *>(expr_ast.get())->func_name_;
+      } else if (expr_ast->type_ == ASTNodeType::FUNCTION_EXPR) {
+        col_name =
+            static_cast<const FunctionExpr *>(expr_ast.get())->func_name_;
+      } else {
+        col_name = "expr";
+      }
     }
 
-    if (col_idx == static_cast<uint32_t>(-1))
-      throw std::runtime_error("Planner Error: Column '" + target_col +
-                               "' not found.");
-
-    std::string final_name = alias.empty() ? target_col : alias;
-    out_columns.push_back(
-        Column(final_name, current_schema->GetColumn(col_idx).GetTypeId()));
-
-    auto col_expr = std::make_unique<ColumnValueExpression>(0, col_idx);
-    proj_exprs.push_back(col_expr.get());
-    expressions_.push_back(std::move(col_expr));
+    out_columns.push_back(Column(col_name, return_type));
+    proj_exprs.push_back(expr.get());
+    expressions_.push_back(std::move(expr));
   }
 
   auto out_schema = std::make_unique<Schema>(out_columns);
@@ -509,7 +500,8 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
       throw std::runtime_error("Planner Error: Column/Alias '" +
                                col_ref->col_name_ + "' not found.");
     }
-    return std::make_unique<ColumnValueExpression>(0, col_idx);
+    TypeId return_type = schema->GetColumn(col_idx).GetTypeId();
+    return std::make_unique<ColumnValueExpression>(0, col_idx, return_type);
   }
 
   if (const auto *const_expr = dynamic_cast<const ConstantExpr *>(ast_expr)) {
@@ -574,6 +566,28 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
                                                   std::move(right));
   }
 
+  if (const auto *func_expr = dynamic_cast<const FunctionExpr *>(ast_expr)) {
+    static const std::unordered_map<std::string, StringFuncType> func_map = {
+        {"UPPER", StringFuncType::UPPER},
+        {"LOWER", StringFuncType::LOWER},
+        {"LENGTH", StringFuncType::LENGTH},
+        {"CONCAT", StringFuncType::CONCAT},
+        {"SUBSTRING", StringFuncType::SUBSTRING}};
+
+    auto it = func_map.find(func_expr->func_name_);
+    if (it == func_map.end()) {
+      throw std::runtime_error("Planner Error: Unsupported function '" +
+                               func_expr->func_name_ + "'");
+    }
+
+    std::vector<std::unique_ptr<AbstractExpression>> args;
+    for (const auto &arg : func_expr->args_) {
+      args.push_back(PlanExpression(arg.get(), schema, alias_map));
+    }
+
+    return std::make_unique<StringExpression>(it->second, std::move(args));
+  }
+
   if (const auto *log_expr = dynamic_cast<const LogicalExpr *>(ast_expr)) {
     auto left = PlanExpression(log_expr->left_.get(), schema, alias_map);
     auto right = PlanExpression(log_expr->right_.get(), schema, alias_map);
@@ -604,13 +618,17 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
     auto lower = PlanExpression(btw_expr->lower_.get(), schema, alias_map);
     auto upper = PlanExpression(btw_expr->upper_.get(), schema, alias_map);
 
-    auto comp1 = std::make_unique<ComparisonExpression>(
-        CompType::GREATER_THAN_OR_EQUAL, std::move(target1), std::move(lower));
-    auto comp2 = std::make_unique<ComparisonExpression>(
-        CompType::LESS_THAN_OR_EQUAL, std::move(target2), std::move(upper));
+    std::unique_ptr<AbstractExpression> comp1 =
+        std::make_unique<ComparisonExpression>(CompType::GREATER_THAN_OR_EQUAL,
+                                               std::move(target1),
+                                               std::move(lower));
+    std::unique_ptr<AbstractExpression> comp2 =
+        std::make_unique<ComparisonExpression>(
+            CompType::LESS_THAN_OR_EQUAL, std::move(target2), std::move(upper));
 
-    auto logical_and = std::make_unique<LogicExpression>(
-        LogicType::AND, std::move(comp1), std::move(comp2));
+    std::unique_ptr<AbstractExpression> logical_and =
+        std::make_unique<LogicExpression>(LogicType::AND, std::move(comp1),
+                                          std::move(comp2));
 
     if (btw_expr->is_not_) {
       return std::make_unique<LogicExpression>(LogicType::NOT,
