@@ -1,8 +1,10 @@
 // table_heap.cpp
 
 #include "storage/table/table_heap.h"
+#include "concurrency/lock_manager.h"
 #include "concurrency/transaction.h"
 #include "storage/page/page_guard.h"
+
 
 namespace tetodb {
 
@@ -55,7 +57,8 @@ TableHeap::TableHeap(BufferPoolManager *bpm, page_id_t first_page_id,
   last_page_id_ = prev_page_id;
 }
 
-bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn) {
+bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn,
+                            LockManager *lock_mgr) {
   if (tuple.GetSize() + 32 > PAGE_SIZE)
     return false;
 
@@ -95,6 +98,13 @@ bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn) {
 
     if (!new_table_page->InsertTuple(tuple, rid)) {
       return false;
+    }
+
+    // NEW: Atomic Lock Acquisition underneath the guard
+    if (txn != nullptr && lock_mgr != nullptr) {
+      if (!lock_mgr->LockExclusive(txn, *rid)) {
+        return false;
+      }
     }
 
     new_guard.MarkDirty();
@@ -144,6 +154,13 @@ bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn) {
   auto table_page = guard.As<TablePage>();
 
   if (table_page->InsertTuple(tuple, rid)) {
+    // NEW: Atomic Lock Acquisition underneath the guard
+    if (txn != nullptr && lock_mgr != nullptr) {
+      if (!lock_mgr->LockExclusive(txn, *rid)) {
+        return false;
+      }
+    }
+
     guard.MarkDirty();
 
     {
@@ -224,7 +241,8 @@ bool TableHeap::MarkDelete(const RID &rid, Transaction *txn) {
   return false;
 }
 
-bool TableHeap::UpdateTuple(const Tuple &tuple, RID *rid, Transaction *txn) {
+bool TableHeap::UpdateTuple(const Tuple &tuple, RID *rid, Transaction *txn,
+                            LockManager *lock_mgr) {
   Page *page = bpm_->FetchPage(rid->GetPageId());
   if (page == nullptr)
     return false;
@@ -265,7 +283,7 @@ bool TableHeap::UpdateTuple(const Tuple &tuple, RID *rid, Transaction *txn) {
   }
 
   RID new_rid;
-  if (InsertTuple(tuple, &new_rid, txn)) {
+  if (InsertTuple(tuple, &new_rid, txn, lock_mgr)) {
     *rid = new_rid;
     return true;
   }

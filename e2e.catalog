@@ -1,12 +1,15 @@
-TABLE t1 10
-COLUMN id1 4
-COLUMN name1 7
+TABLE employees 0
+COLUMN id 4
+COLUMN name 7
+COLUMN salary 4
+COLUMN department 7
 END
-TABLE t2 11
-COLUMN id2 4
-COLUMN value2 4
+TABLE projects 2
+COLUMN proj_id 4
+COLUMN emp_id 4
+COLUMN proj_name 7
 END
-TABLE t3 12
-COLUMN value3 4
-COLUMN tag3 7
+TABLE isolation_test 0
+COLUMN id 4
+COLUMN val 7
 END

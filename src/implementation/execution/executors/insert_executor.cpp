@@ -127,13 +127,9 @@ bool InsertExecutor::Next(Tuple *tuple, RID *rid) {
   // 3. PHYSICAL INSERTION & LOGGING
   // ==========================================
   RID new_rid;
-  if (table_info_->table_->InsertTuple(to_insert, &new_rid, txn)) {
-    LockManager *lock_mgr = exec_ctx_->GetLockManager();
+  LockManager *lock_mgr = exec_ctx_->GetLockManager();
 
-    bool locked = lock_mgr->LockExclusive(txn, new_rid);
-    if (!locked)
-      throw std::runtime_error(
-          "Transaction Aborted: Failed to acquire Exclusive Lock on Insert.");
+  if (table_info_->table_->InsertTuple(to_insert, &new_rid, txn, lock_mgr)) {
 
     TableWriteRecord write_record(new_rid, WType::INSERT,
                                   table_info_->table_.get());

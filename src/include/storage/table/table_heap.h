@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "concurrency/lock_manager.h"
 #include "recovery/log_manager.h"
 #include "storage/buffer/buffer_pool_manager.h"
 #include "storage/page/table_page.h"
@@ -117,13 +118,15 @@ public:
 
   inline page_id_t GetFirstPageId() { return first_page_id_; }
 
-  bool InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn = nullptr);
+  bool InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn = nullptr,
+                   LockManager *lock_mgr = nullptr);
 
   bool GetTuple(const RID &rid, Tuple *tuple, Transaction *txn = nullptr);
 
   bool MarkDelete(const RID &rid, Transaction *txn = nullptr);
 
-  bool UpdateTuple(const Tuple &tuple, RID *rid, Transaction *txn = nullptr);
+  bool UpdateTuple(const Tuple &tuple, RID *rid, Transaction *txn = nullptr,
+                   LockManager *lock_mgr = nullptr);
 
   bool RollbackDelete(const RID &rid, const Tuple &tuple,
                       Transaction *txn = nullptr);

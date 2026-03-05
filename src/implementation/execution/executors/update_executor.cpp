@@ -175,17 +175,9 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
     // ==========================================
     // 4. PHYSICAL UPDATE & LOGGING OF TARGET ROW
     // ==========================================
-    if (table_info_->table_->UpdateTuple(new_tuple, &new_rid, txn)) {
+    if (table_info_->table_->UpdateTuple(new_tuple, &new_rid, txn, lock_mgr)) {
       // UpdateTuple internally logs DELETE + INSERT write records,
       // so we do NOT add another TableWriteRecord here.
-
-      // If the tuple moved to a different page, lock the new RID
-      if (new_rid != child_rid) {
-        if (!acquire_write_lock(new_rid)) {
-          throw std::runtime_error("Transaction Aborted: Failed to acquire "
-                                   "Exclusive Lock on relocated tuple.");
-        }
-      }
 
       for (IndexMetadata *index_info : table_indexes_) {
         std::vector<Column> key_cols;
