@@ -9,33 +9,8 @@
 #include "index/generic_key.h"
 #include "storage/page/header_page.h"
 #include <cstring>
-#include <new>
 
 namespace tetodb {
-
-#define SAFE_LEAF_CAST(page_ptr)                                               \
-  [&]() {                                                                      \
-    char temp_item[sizeof(std::pair<KeyType, ValueType>)];                     \
-    std::memcpy(temp_item, (page_ptr)->GetData() + LEAF_PAGE_HEADER_SIZE,      \
-                sizeof(std::pair<KeyType, ValueType>));                        \
-    auto *n = new ((page_ptr)->GetData())                                      \
-        BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;                  \
-    std::memcpy((page_ptr)->GetData() + LEAF_PAGE_HEADER_SIZE, temp_item,      \
-                sizeof(std::pair<KeyType, ValueType>));                        \
-    return n;                                                                  \
-  }()
-
-#define SAFE_INTERNAL_CAST(page_ptr)                                           \
-  [&]() {                                                                      \
-    char temp_item[sizeof(std::pair<KeyType, page_id_t>)];                     \
-    std::memcpy(temp_item, (page_ptr)->GetData() + INTERNAL_PAGE_HEADER_SIZE,  \
-                sizeof(std::pair<KeyType, page_id_t>));                        \
-    auto *n = new ((page_ptr)->GetData())                                      \
-        BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>;              \
-    std::memcpy((page_ptr)->GetData() + INTERNAL_PAGE_HEADER_SIZE, temp_item,  \
-                sizeof(std::pair<KeyType, page_id_t>));                        \
-    return n;                                                                  \
-  }()
 
 INDEX_TEMPLATE_ARGUMENTS
 BPLUSTREE_TYPE::BPlusTree(std::string name,
@@ -62,7 +37,9 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType &key,
     if (page == nullptr)
       return false;
 
-    auto *leaf_page = SAFE_LEAF_CAST(page);
+    auto *leaf_page = reinterpret_cast<
+        BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(
+        page->GetData());
 
     bool found = false;
 
@@ -90,8 +67,9 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType &key,
         buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
 
         page = next_page;
-        leaf_page = new (page->GetData())
-            BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
+        leaf_page = reinterpret_cast<
+            BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(
+            page->GetData());
         idx = 0; // Reset index for the new page
       } else {
         break; // No more duplicates, or end of the tree
@@ -152,7 +130,9 @@ Page *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key, bool leftMost,
   }
 
   while (!node->IsLeafPage()) {
-    auto *internal = SAFE_INTERNAL_CAST(page);
+    auto *internal = reinterpret_cast<
+        BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(
+        page->GetData());
 
     page_id_t child_page_id;
     if (leftMost) {
@@ -264,7 +244,9 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
     throw Exception(ExceptionType::OUT_OF_MEMORY, "Out of memory");
   }
 
-  auto *leaf = SAFE_LEAF_CAST(page);
+  auto *leaf =
+      reinterpret_cast<BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(
+          page->GetData());
   leaf->Init(page_id, INVALID_PAGE_ID, leaf_max_size_);
   leaf->Insert(key, value, comparator_);
 
@@ -365,15 +347,15 @@ template <typename N> N *BPLUSTREE_TYPE::Split(N *node) {
     throw Exception(ExceptionType::OUT_OF_MEMORY, "Out of memory");
   }
 
-  auto *new_node = new (page->GetData()) N;
+  auto *new_node = reinterpret_cast<N *>(page->GetData());
   new_node->Init(page_id, node->GetParentPageId(), node->GetMaxSize());
   node->MoveHalfTo(new_node, buffer_pool_manager_);
 
   if (node->IsLeafPage()) {
-    auto *leaf =
-        new (node) BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
-    auto *new_leaf =
-        new (new_node) BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
+    auto *leaf = reinterpret_cast<
+        BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(node);
+    auto *new_leaf = reinterpret_cast<
+        BPlusTreeLeafPage<KeyType, ValueType, KeyComparator> *>(new_node);
 
     new_leaf->SetNextPageId(leaf->GetNextPageId());
     leaf->SetNextPageId(new_leaf->GetPageId());
@@ -393,8 +375,9 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
     if (page == nullptr)
       throw Exception(ExceptionType::OUT_OF_MEMORY, "Out of memory");
 
-    auto *new_root = new (page->GetData())
-        BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>;
+    auto *new_root = reinterpret_cast<
+        BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(
+        page->GetData());
     new_root->Init(new_root_id, INVALID_PAGE_ID, internal_max_size_);
     new_root->PopulateNewRoot(old_node->GetPageId(), key,
                               new_node->GetPageId());
@@ -413,7 +396,9 @@ void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node,
   if (page == nullptr)
     throw Exception(ExceptionType::OUT_OF_MEMORY, "Out of memory");
 
-  auto *parent = SAFE_INTERNAL_CAST(page);
+  auto *parent = reinterpret_cast<
+      BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(
+      page->GetData());
 
   try {
     parent->InsertNodeAfter(old_node->GetPageId(), key, new_node->GetPageId());
@@ -461,13 +446,15 @@ void BPLUSTREE_TYPE::Print(BufferPoolManager *bpm) {
     }
 
     Page *page = bpm->FetchPage(pid);
-    auto *node = new (page->GetData()) BPlusTreePage;
+    auto *node = reinterpret_cast<BPlusTreePage *>(page->GetData());
 
     std::cout << "[PID=" << pid << " Type=" << (node->IsLeafPage() ? "L" : "I")
               << " Size=" << node->GetSize() << "] ";
 
     if (!node->IsLeafPage()) {
-      auto *internal = SAFE_INTERNAL_CAST(page);
+      auto *internal = reinterpret_cast<
+          BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(
+          page->GetData());
       for (int i = 0; i < internal->GetSize(); i++) {
         q.push({internal->ValueAt(i), depth + 1});
       }
@@ -555,11 +542,11 @@ void BPLUSTREE_TYPE::DestroyNode(page_id_t page_id) {
   if (page == nullptr)
     return;
 
-  auto *node = new (page->GetData()) BPlusTreePage;
+  auto *node = reinterpret_cast<BPlusTreePage *>(page->GetData());
 
   if (!node->IsLeafPage()) {
-    auto *internal =
-        new (node) BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>;
+    auto *internal = reinterpret_cast<
+        BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *>(node);
     for (int i = 0; i < internal->GetSize(); i++) {
       DestroyNode(internal->ValueAt(i));
     }

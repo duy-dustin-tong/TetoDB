@@ -361,6 +361,12 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
         res.status_msg = "SELECT " + std::to_string(res.rows.size());
     }
 
+    // Release the checkpoint shared lock BEFORE commit/abort.
+    // Commit() calls log_manager_->Flush() which blocks. If the checkpoint
+    // manager fires while cp_lock is held, it tries to take an exclusive lock
+    // on GlobalTxnLatch, blocking all new shared locks → convoy deadlock.
+    cp_lock.unlock();
+
     if (is_autocommit)
       txn_mgr_->Commit(exec_txn);
   } catch (const std::exception &e) {
