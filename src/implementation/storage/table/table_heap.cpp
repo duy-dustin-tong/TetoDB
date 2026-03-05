@@ -5,7 +5,6 @@
 #include "concurrency/transaction.h"
 #include "storage/page/page_guard.h"
 
-
 namespace tetodb {
 
 TableHeap::TableHeap(BufferPoolManager *bpm, LogManager *log_manager,
@@ -103,6 +102,8 @@ bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn,
     // NEW: Atomic Lock Acquisition underneath the guard
     if (txn != nullptr && lock_mgr != nullptr) {
       if (!lock_mgr->LockExclusive(txn, *rid)) {
+        new_table_page->ApplyDelete(*rid);
+        new_guard.MarkDirty();
         return false;
       }
     }
@@ -157,6 +158,8 @@ bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn,
     // NEW: Atomic Lock Acquisition underneath the guard
     if (txn != nullptr && lock_mgr != nullptr) {
       if (!lock_mgr->LockExclusive(txn, *rid)) {
+        table_page->ApplyDelete(*rid);
+        guard.MarkDirty();
         return false;
       }
     }
