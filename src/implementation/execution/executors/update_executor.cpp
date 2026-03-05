@@ -140,7 +140,13 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
         Tuple search_key(std::vector<Value>{new_child_val}, &p_key_schema);
         std::vector<RID> p_rids;
         pk_index->index_->ScanKey(search_key, &p_rids, txn);
-        found_parent = !p_rids.empty();
+        if (!p_rids.empty()) {
+          found_parent = true;
+          if (!lock_mgr->LockShared(txn, p_rids[0])) {
+            throw std::runtime_error("Transaction Aborted: Failed to acquire "
+                                     "Shared Lock on Parent Tuple.");
+          }
+        }
       } else {
         auto p_iter = parent_meta->table_->Begin(txn);
         while (p_iter != parent_meta->table_->End()) {
@@ -150,6 +156,11 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
                                            fk.parent_key_attrs_[0]);
             if (p_val.CompareEquals(new_child_val)) {
               found_parent = true;
+              if (!lock_mgr->LockShared(txn, p_iter.GetRid())) {
+                throw std::runtime_error(
+                    "Transaction Aborted: Failed to acquire Shared Lock on "
+                    "Parent Tuple.");
+              }
               break;
             }
           }

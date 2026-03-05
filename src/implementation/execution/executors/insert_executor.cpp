@@ -73,6 +73,8 @@ bool InsertExecutor::Next(Tuple *tuple, RID *rid) {
   // ==========================================
   // 2. FOREIGN KEY CONSTRAINT CHECK
   // ==========================================
+  LockManager *lock_mgr = exec_ctx_->GetLockManager();
+
   for (const auto &fk : table_info_->foreign_keys_) {
     Value child_val = to_insert.GetValue(schema, fk.child_key_attrs_[0]);
     TableMetadata *parent_meta = catalog->GetTable(fk.parent_table_oid_);
@@ -98,7 +100,13 @@ bool InsertExecutor::Next(Tuple *tuple, RID *rid) {
       Tuple search_key(std::vector<Value>{child_val}, &p_key_schema);
       std::vector<RID> p_rids;
       pk_index->index_->ScanKey(search_key, &p_rids, txn);
-      found_parent = !p_rids.empty();
+      if (!p_rids.empty()) {
+        found_parent = true;
+        if (!lock_mgr->LockShared(txn, p_rids[0])) {
+          throw std::runtime_error("Transaction Aborted: Failed to acquire "
+                                   "Shared Lock on Parent Tuple.");
+        }
+      }
     } else {
       auto p_iter = parent_meta->table_->Begin(txn);
       while (p_iter != parent_meta->table_->End()) {
@@ -108,6 +116,10 @@ bool InsertExecutor::Next(Tuple *tuple, RID *rid) {
               p_tuple.GetValue(&parent_meta->schema_, fk.parent_key_attrs_[0]);
           if (p_val.CompareEquals(child_val)) {
             found_parent = true;
+            if (!lock_mgr->LockShared(txn, p_iter.GetRid())) {
+              throw std::runtime_error("Transaction Aborted: Failed to acquire "
+                                       "Shared Lock on Parent Tuple.");
+            }
             break;
           }
         }
@@ -127,7 +139,6 @@ bool InsertExecutor::Next(Tuple *tuple, RID *rid) {
   // 3. PHYSICAL INSERTION & LOGGING
   // ==========================================
   RID new_rid;
-  LockManager *lock_mgr = exec_ctx_->GetLockManager();
 
   if (table_info_->table_->InsertTuple(to_insert, &new_rid, txn, lock_mgr)) {
 

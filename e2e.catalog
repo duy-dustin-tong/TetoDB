@@ -13,3 +13,14 @@ TABLE isolation_test 0
 COLUMN id 4
 COLUMN val 7
 END
+TABLE parent_table 4
+COLUMN id 4
+COLUMN data 7
+END
+TABLE child_table 5
+COLUMN c_id 4
+COLUMN p_id 4
+END
+INDEX pk_parent_table 5 -1 1 1 0 
+INDEX pk_child_table 6 -1 1 1 0 
+FK child_table fk_child_table_parent_table parent_table 1 0 0 0
