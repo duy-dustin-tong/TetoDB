@@ -21,6 +21,10 @@ TABLE child_table 5
 COLUMN c_id 4
 COLUMN p_id 4
 END
-INDEX pk_parent_table 5 -1 1 1 0 
-INDEX pk_child_table 6 -1 1 1 0 
+TABLE phantom_test 10
+COLUMN id 4
+COLUMN val 4
+END
+INDEX pk_phantom_test 6 -1 1 1 0 
+INDEX idx_val 6 -1 1 0 1 
 FK child_table fk_child_table_parent_table parent_table 1 0 0 0
