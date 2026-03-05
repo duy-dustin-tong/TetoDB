@@ -39,6 +39,7 @@ TetoDBInstance::TetoDBInstance(const std::string &db_file_name) {
   RecoveryManager recovery_mgr(disk_manager_.get(), bpm_.get(), db_file_name);
   recovery_mgr.Redo();
   recovery_mgr.Undo();
+  bool needs_index_rebuild = recovery_mgr.DidWork();
 
   log_mgr_->RunFlushThread();
   lock_mgr_ = std::make_unique<LockManager>();
@@ -53,7 +54,7 @@ TetoDBInstance::TetoDBInstance(const std::string &db_file_name) {
       txn_mgr_.get(), log_mgr_.get(), bpm_.get());
   checkpoint_mgr_->StartCheckpointer(std::chrono::seconds(5));
 
-  catalog_->LoadCatalog(catalog_path);
+  catalog_->LoadCatalog(catalog_path, needs_index_rebuild);
   std::cout << "[SYSTEM] TetoDB Instance Online. Awaiting connections.\n";
 }
 

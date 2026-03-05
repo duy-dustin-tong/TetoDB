@@ -55,6 +55,7 @@ void RecoveryManager::Redo() {
     log_record.Deserialize(buffer.data());
 
     lsn_mapping_[log_record.GetLSN()] = offset;
+    did_work_ = true;
 
     if (log_record.GetTxnId() != INVALID_TRANSACTION_ID) {
       if (log_record.GetLogRecordType() == LogRecordType::COMMIT ||
@@ -96,13 +97,12 @@ void RecoveryManager::Redo() {
         WritePageGuard guard(bpm_, page);
         auto table_page = guard.As<TablePage>();
 
-        if (table_page->GetNextPageId() == 0) {
+        // Detect uninitialized pages: Init() sets FreeSpacePointer to
+        // PAGE_SIZE (4096). An uninitialized page (all zeros from disk)
+        // has FreeSpacePointer == 0. We cannot use GetNextPageId() == 0
+        // because page_id 0 is a valid page.
+        if (table_page->GetFreeSpacePointer() == 0) {
           table_page->Init(rid.GetPageId(), PAGE_SIZE);
-          // The only time a page arrives uninitialized during an INSERT log
-          // replay is when it is the very first page of a newly minted table
-          // (DDL is not logged). Therefore, its prev_page_id MUST be
-          // INVALID_PAGE_ID, which Init() sets default. We intentionally remove
-          // the buggy sequential `page_id - 1` cross-linking here.
         }
 
         if (table_page->GetLSN() >= log_record.GetLSN()) {

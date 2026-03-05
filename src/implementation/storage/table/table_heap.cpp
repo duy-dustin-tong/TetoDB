@@ -29,8 +29,7 @@ TableHeap::TableHeap(BufferPoolManager *bpm, page_id_t first_page_id,
                      LogManager *log_manager)
     : bpm_(bpm), log_manager_(log_manager), first_page_id_(first_page_id),
       fsm_populated_(false) {
-  // Only walk pages to find last_page_id_ — defer FSM population to first
-  // INSERT
+  // Walk pages to find last_page_id_
   page_id_t current_page_id = first_page_id;
   page_id_t prev_page_id = INVALID_PAGE_ID;
 
@@ -47,7 +46,7 @@ TableHeap::TableHeap(BufferPoolManager *bpm, page_id_t first_page_id,
     page_id_t next_page_id = table_page->GetNextPageId();
 
     if (next_page_id == current_page_id) {
-      break;
+      break; // Self-loop guard
     }
 
     current_page_id = next_page_id;

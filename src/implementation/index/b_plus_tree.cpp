@@ -123,9 +123,7 @@ Page *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key, bool leftMost,
       root_latch_.WUnlock();
       root_locked = false;
     } else {
-      if (transaction != nullptr) {
-        transaction->AddLockedLatch(&root_latch_);
-      }
+      transaction->AddLockedLatch(&root_latch_);
     }
   }
 
@@ -169,15 +167,7 @@ Page *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key, bool leftMost,
         }
       }
 
-      // --- FIX: Prevent Nullptr Dereference during PopulateIndex ---
-      if (transaction != nullptr) {
-        transaction->AddIntoPageSet(page);
-      } else {
-        // Safe fallback for single-threaded boot operations to prevent pin
-        // leaks
-        page->WUnlatch();
-        buffer_pool_manager_->UnpinPage(page->GetPageId(), false);
-      }
+      transaction->AddIntoPageSet(page);
     }
 
     page = child_page;

@@ -318,6 +318,13 @@ void Catalog::PopulateIndex(TableMetadata *table_meta,
                             IndexMetadata *index_meta, Transaction *txn) {
   std::unique_lock<std::shared_mutex> table_lock(table_meta->table_latch_);
 
+  // Use the caller's transaction, or create a local one for boot-time
+  // index rebuilds (e.g., after crash recovery). A single Transaction
+  // is safe because InsertIntoLeaf calls UnlockUnpinPages() after each
+  // insert, which clears the page set between inserts.
+  Transaction boot_txn(0);
+  Transaction *effective_txn = (txn != nullptr) ? txn : &boot_txn;
+
   std::vector<Column> key_cols;
   for (uint32_t col_idx : index_meta->key_attrs_) {
     key_cols.push_back(table_meta->schema_.GetColumn(col_idx));
@@ -328,7 +335,7 @@ void Catalog::PopulateIndex(TableMetadata *table_meta,
   while (iter != table_meta->table_->End()) {
     RID rid = iter.GetRid();
     Tuple tuple;
-    if (table_meta->table_->GetTuple(rid, &tuple, txn)) {
+    if (table_meta->table_->GetTuple(rid, &tuple, effective_txn)) {
 
       std::vector<Value> key_values;
       for (uint32_t col_idx : index_meta->key_attrs_) {
@@ -336,7 +343,7 @@ void Catalog::PopulateIndex(TableMetadata *table_meta,
       }
 
       Tuple key_tuple(key_values, &key_schema);
-      index_meta->index_->InsertEntry(key_tuple, rid, txn);
+      index_meta->index_->InsertEntry(key_tuple, rid, effective_txn);
     }
     ++iter;
   }
@@ -492,7 +499,8 @@ void Catalog::SaveCatalog(const std::string &file_path) {
   }
 }
 
-void Catalog::LoadCatalog(const std::string &file_path) {
+void Catalog::LoadCatalog(const std::string &file_path,
+                          bool force_index_rebuild) {
   std::ifstream in(file_path);
   if (!in.is_open())
     return;
@@ -533,9 +541,12 @@ void Catalog::LoadCatalog(const std::string &file_path) {
 
       TableMetadata *t_meta = GetTable(tbl_oid);
       if (t_meta) {
-        // --- UPDATED: Pass the deserialized flag ---
+        // After crash recovery, B+Tree pages may be stale (recovery modified
+        // table pages without updating indexes). Force a full rebuild.
+        page_id_t effective_root =
+            force_index_rebuild ? INVALID_PAGE_ID : root_page_id;
         CreateIndex(idx_name, t_meta->oid_, attrs, is_unique, nullptr,
-                    root_page_id);
+                    effective_root);
       }
     } else if (token == "FK") {
       std::string child_table, fk_name, parent_table;

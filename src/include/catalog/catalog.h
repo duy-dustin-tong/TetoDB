@@ -142,7 +142,8 @@ public:
   bool DropView(const std::string &view_name);
 
   void SaveCatalog(const std::string &file_path);
-  void LoadCatalog(const std::string &file_path);
+  void LoadCatalog(const std::string &file_path,
+                   bool force_index_rebuild = false);
 
 private:
   void PopulateIndex(TableMetadata *table_meta, IndexMetadata *index_meta,
