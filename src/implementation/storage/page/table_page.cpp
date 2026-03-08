@@ -108,6 +108,9 @@ bool TablePage::ForceInsertTuple(const Tuple &tuple, const RID &rid) {
 
   if (GetFreeSpaceRemaining() < tuple_size) {
     Compact();
+    if (GetFreeSpaceRemaining() < tuple_size) {
+      return false;
+    }
   }
 
   uint32_t free_space_ptr = GetFreeSpacePointer();
