@@ -56,6 +56,11 @@ bool IndexScanExecutor::Next(Tuple *tuple, RID *rid) {
     // Advance the latch-crabbing underlying Iterator
     iterator_->Advance();
 
+    // Release Shared Lock if READ_COMMITTED isolation level
+    if (txn->GetIsolationLevel() == IsolationLevel::READ_COMMITTED) {
+      lock_mgr->Unlock(txn, *rid);
+    }
+
     if (!success) {
       continue;
     }
