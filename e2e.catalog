@@ -6,3 +6,7 @@ TABLE bug8_bigint 1
 COLUMN id 5
 COLUMN name 7
 END
+TABLE isolation_test 1
+COLUMN id 4
+COLUMN val 7
+END

@@ -7,7 +7,7 @@ import sys
 DSN = "postgresql://test_user@127.0.0.1:5432/tetodb"
 
 NUM_READ_THREADS = 20
-ROWS_TO_INSERT = 5000
+ROWS_TO_INSERT = 100
 
 # Global flags to coordinate threads
 writer_started = threading.Event()

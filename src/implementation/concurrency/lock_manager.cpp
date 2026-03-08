@@ -5,6 +5,15 @@
 namespace tetodb {
 
 bool LockManager::LockShared(Transaction *txn, const RID &rid) {
+  if (txn->GetState() == TransactionState::SHRINKING) {
+    txn->SetState(TransactionState::ABORTED);
+    return false;
+  }
+  if (txn->GetIsolationLevel() == IsolationLevel::READ_UNCOMMITTED) {
+    txn->SetState(TransactionState::ABORTED);
+    return false;
+  }
+
   std::unique_lock<std::mutex> lock(latch_);
 
   // 1. Get/Create the queue for this RID
@@ -60,6 +69,11 @@ bool LockManager::LockShared(Transaction *txn, const RID &rid) {
 }
 
 bool LockManager::LockExclusive(Transaction *txn, const RID &rid) {
+  if (txn->GetState() == TransactionState::SHRINKING) {
+    txn->SetState(TransactionState::ABORTED);
+    return false;
+  }
+
   std::unique_lock<std::mutex> lock(latch_);
 
   LockRequestQueue &queue = lock_table_[rid];
@@ -128,9 +142,11 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
 
   // 3. Find our request and remove it
   bool found = false;
+  LockMode released_mode = LockMode::SHARED;
   for (auto it = queue.request_queue_.begin(); it != queue.request_queue_.end();
        ++it) {
     if (it->txn_id_ == txn->GetTransactionId()) {
+      released_mode = it->lock_mode_;
       queue.request_queue_.erase(it);
       found = true;
       break;
@@ -142,7 +158,10 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
 
   // 4. Update Transaction State (Shrinking Phase of 2PL)
   if (txn->GetState() == TransactionState::GROWING) {
-    txn->SetState(TransactionState::SHRINKING);
+    if (!(txn->GetIsolationLevel() == IsolationLevel::READ_COMMITTED &&
+          released_mode == LockMode::SHARED)) {
+      txn->SetState(TransactionState::SHRINKING);
+    }
   }
 
   // 5. Wake up waiters
@@ -151,12 +170,19 @@ bool LockManager::Unlock(Transaction *txn, const RID &rid) {
 }
 
 bool LockManager::LockUpgrade(Transaction *txn, const RID &rid) {
+  if (txn->GetState() == TransactionState::SHRINKING) {
+    txn->SetState(TransactionState::ABORTED);
+    return false;
+  }
+
   std::unique_lock<std::mutex> lock(latch_);
   LockRequestQueue &queue = lock_table_[rid];
 
   // 1. Check if we can upgrade
-  if (queue.upgrading_)
+  if (queue.upgrading_) {
+    txn->SetState(TransactionState::ABORTED);
     return false; // Only 1 upgrade allowed at a time
+  }
 
   // 2. Find our existing Shared lock
   auto it = queue.request_queue_.begin();
