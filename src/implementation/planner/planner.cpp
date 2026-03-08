@@ -623,7 +623,12 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
         if (raw_str.find('.') != std::string::npos) {
           val = Value(TypeId::DECIMAL, std::stod(raw_str));
         } else {
-          val = Value(TypeId::INTEGER, std::stoi(raw_str));
+          int64_t v = std::stoll(raw_str);
+          if (v >= INT32_MIN && v <= INT32_MAX) {
+            val = Value(TypeId::INTEGER, static_cast<int32_t>(v));
+          } else {
+            val = Value(TypeId::BIGINT, v);
+          }
         }
       } catch (...) {
         val = Value(TypeId::VARCHAR, raw_str);

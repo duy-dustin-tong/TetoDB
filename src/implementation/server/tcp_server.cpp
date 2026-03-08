@@ -278,9 +278,13 @@ void TcpServer::HandleClient(SOCKET client_socket) {
               WriteString(rd, col.GetName());
               WriteInt32(rd, 0);
               WriteInt16(rd, 0);
-              WriteInt32(rd, (col.GetTypeId() == TypeId::INTEGER
-                                  ? 23
-                                  : 25)); // INT4 or TEXT
+              int32_t pg_type = 25; // TEXT
+              if (col.GetTypeId() == TypeId::INTEGER) {
+                pg_type = 23; // INT4
+              } else if (col.GetTypeId() == TypeId::BIGINT) {
+                pg_type = 20; // INT8
+              }
+              WriteInt32(rd, pg_type);
               WriteInt16(rd, -1);
               WriteInt32(rd, -1);
               WriteInt16(rd, 0);
@@ -385,11 +389,12 @@ void TcpServer::HandleClient(SOCKET client_socket) {
             session.current_parameters.push_back(Value(TypeId::INTEGER, val));
           } else if (fmt == 1 && param_len == 8) {
             // Binary int64 (big-endian)
-            uint64_t raw;
-            memcpy(&raw, p, 8);
+            uint32_t high_raw, low_raw;
+            std::memcpy(&high_raw, p, 4);
+            std::memcpy(&low_raw, p + 4, 4);
             int64_t val = static_cast<int64_t>(
-                (static_cast<uint64_t>(ntohl(raw & 0xFFFFFFFF)) << 32) |
-                ntohl(raw >> 32));
+                (static_cast<uint64_t>(ntohl(high_raw)) << 32) |
+                ntohl(low_raw));
             p += param_len;
             session.current_parameters.push_back(Value(TypeId::BIGINT, val));
           } else {
@@ -402,8 +407,19 @@ void TcpServer::HandleClient(SOCKET client_socket) {
                 std::all_of(param_str.begin() + (param_str[0] == '-' ? 1 : 0),
                             param_str.end(), ::isdigit);
             if (is_number) {
-              session.current_parameters.push_back(
-                  Value(TypeId::INTEGER, std::stoi(param_str)));
+              try {
+                int64_t v = std::stoll(param_str);
+                if (v >= INT32_MIN && v <= INT32_MAX) {
+                  session.current_parameters.push_back(
+                      Value(TypeId::INTEGER, static_cast<int32_t>(v)));
+                } else {
+                  session.current_parameters.push_back(
+                      Value(TypeId::BIGINT, v));
+                }
+              } catch (...) {
+                session.current_parameters.push_back(
+                    Value(TypeId::VARCHAR, param_str));
+              }
             } else {
               session.current_parameters.push_back(
                   Value(TypeId::VARCHAR, param_str));
