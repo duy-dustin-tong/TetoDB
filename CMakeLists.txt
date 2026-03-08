@@ -76,6 +76,9 @@ add_executable(teto_main "src/server_main.cpp")
 # 4. Create the Client Executable
 add_executable(teto_client "src/client_main.cpp" "src/include/execution/expressions/parameter_value_expression.h")
 
+add_executable(test_bug7 "src/test_bug7_compaction.cpp")
+target_link_libraries(test_bug7 tetodb_lib)
+
 # 5. Link the Core Library to the Server
 target_link_libraries(teto_main tetodb_lib)
 

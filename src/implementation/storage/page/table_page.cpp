@@ -17,6 +17,7 @@ void TablePage::Init(page_id_t page_id, uint32_t page_size,
 
 void TablePage::Compact() {
   char temp_page[PAGE_SIZE];
+  std::memset(temp_page, 0, PAGE_SIZE);
   memcpy(temp_page, GetData(), SIZE_TABLE_PAGE_HEADER);
 
   uint32_t slot_count = GetSlotCount();
