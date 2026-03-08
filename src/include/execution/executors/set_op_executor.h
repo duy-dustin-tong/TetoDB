@@ -3,6 +3,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "execution/executors/abstract_executor.h"
@@ -30,8 +31,8 @@ private:
   bool initial_init_{false};
   bool left_exhausted_{false};
 
-  // Used for INTERSECT and EXCEPT
-  std::unordered_set<DistinctKey, DistinctKeyHash> memory_set_;
+  // Used for INTERSECT and EXCEPT (multiset counting)
+  std::unordered_map<DistinctKey, uint32_t, DistinctKeyHash> memory_map_;
   // Used for deduplication (UNION without ALL, or left side of EXCEPT)
   std::unordered_set<DistinctKey, DistinctKeyHash> emitted_set_;
 

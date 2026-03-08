@@ -26,25 +26,25 @@ void SetOpExecutor::Init() {
   initial_init_ = true;
   left_exhausted_ = false;
 
-  memory_set_.clear();
+  memory_map_.clear();
   emitted_set_.clear();
 
   SetOpType set_type = plan_->GetSetOpType();
 
   if (set_type == SetOpType::INTERSECT) {
-    // Build hash set from left child
+    // Build hash map (multiset) from left child
     Tuple tuple;
     RID rid;
     while (left_child_->Next(&tuple, &rid)) {
-      memory_set_.insert(MakeKey(&tuple, left_child_->GetOutputSchema()));
+      memory_map_[MakeKey(&tuple, left_child_->GetOutputSchema())]++;
     }
-    // We will stream the right child and probe memory_set_
+    // We will stream the right child and probe memory_map_
   } else if (set_type == SetOpType::EXCEPT) {
-    // Build hash set from right child
+    // Build hash map (multiset) from right child
     Tuple tuple;
     RID rid;
     while (right_child_->Next(&tuple, &rid)) {
-      memory_set_.insert(MakeKey(&tuple, right_child_->GetOutputSchema()));
+      memory_map_[MakeKey(&tuple, right_child_->GetOutputSchema())]++;
     }
   }
 }
@@ -87,40 +87,48 @@ bool SetOpExecutor::Next(Tuple *tuple, RID *rid) {
     return false;
 
   } else if (set_type == SetOpType::INTERSECT) {
-    // Stream right child, look for matches in memory_set_
+    // Stream right child, look for matches in memory_map_
     while (right_child_->Next(tuple, rid)) {
       auto key = MakeKey(tuple, right_child_->GetOutputSchema());
 
-      // If we found it in the left child
-      if (memory_set_.find(key) != memory_set_.end()) {
+      auto it = memory_map_.find(key);
+      if (it != memory_map_.end() && it->second > 0) {
         if (!plan_->IsAll()) {
-          // If not ALL, we only emit each match once. Remove from memory_set_.
-          memory_set_.erase(key);
+          // INTERSECT DISTINCT: Emit once, then zero the count to never emit
+          // again
+          it->second = 0;
           return true;
         } else {
-          // INTERSECT ALL semantics (bag intersection) is more complex
-          // (requires counting), but if we assume simple stream intersect for
-          // now (matching TetoDB standard requirements):
-          if (emitted_set_.insert(key).second) {
-            return true; // Simple distinct intersect approach
-          }
+          // INTERSECT ALL: Bag intersection (MIN count)
+          // Decrement the left-side token matching this right-side row
+          it->second--;
+          return true;
         }
       }
     }
     return false;
 
   } else if (set_type == SetOpType::EXCEPT) {
-    // Stream left child, exclude if in memory_set_ (which is built from right)
+    // Stream left child, exclude if in memory_map_ (which is built from right)
     while (left_child_->Next(tuple, rid)) {
       auto key = MakeKey(tuple, left_child_->GetOutputSchema());
 
-      if (memory_set_.find(key) == memory_set_.end()) {
-        if (plan_->IsAll()) {
+      auto it = memory_map_.find(key);
+      if (it != memory_map_.end() && it->second > 0) {
+        // MATCH FOUND IN RIGHT CHILD:
+        // Consume one right-side token and DO NOT emit this row (exclude it)
+        it->second--;
+        continue;
+      }
+
+      // NO MATCH FOUND (OR RIGHT SIDE COUNTS EXHAUSTED):
+      if (plan_->IsAll()) {
+        // EXCEPT ALL: Emit the remaining tokens freely
+        return true;
+      } else {
+        // EXCEPT DISTINCT: Deduplicate the final result set
+        if (emitted_set_.insert(key).second) {
           return true;
-        } else {
-          if (emitted_set_.insert(key).second) {
-            return true;
-          }
         }
       }
     }
