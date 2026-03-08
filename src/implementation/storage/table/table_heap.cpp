@@ -253,6 +253,39 @@ bool TableHeap::UpdateTuple(const Tuple &tuple, RID *rid, Transaction *txn,
     WritePageGuard guard(bpm_, page);
 
     Tuple old_tuple;
+
+    // Attempt In-Place Update
+    if (guard.As<TablePage>()->UpdateTuple(tuple, &old_tuple, *rid)) {
+      guard.MarkDirty();
+
+      {
+        std::lock_guard<std::mutex> lock(latch_);
+        fsm_.Update(rid->GetPageId(),
+                    guard.As<TablePage>()->GetFreeSpaceRemaining());
+      }
+
+      if (txn != nullptr) {
+        TableWriteRecord rec;
+        rec.rid_ = *rid;
+        rec.wtype_ = WType::UPDATE;
+        rec.tuple_ = old_tuple; // Log old tuple for undo
+        rec.table_heap_ = this;
+        txn->AppendTableWriteRecord(rec);
+      }
+
+      if (txn != nullptr && log_manager_ != nullptr) {
+        LogRecord log_record(txn->GetTransactionId(), txn->GetPrevLSN(),
+                             LogRecordType::UPDATE, *rid, old_tuple, tuple);
+        lsn_t lsn = log_manager_->AppendLogRecord(&log_record);
+        txn->SetPrevLSN(lsn);
+        guard.As<TablePage>()->SetLSN(lsn);
+      }
+
+      return true;
+    }
+
+    // In-Place Update failed (page full). Fallback to legacy Delete-then-Insert
+    // sequence to migrate the row.
     guard.As<TablePage>()->GetTuple(*rid, &old_tuple);
 
     if (!guard.As<TablePage>()->MarkDelete(*rid)) {

@@ -170,6 +170,69 @@ bool TablePage::GetTuple(const RID &rid, Tuple *tuple) {
   return true;
 }
 
+bool TablePage::UpdateTuple(const Tuple &new_tuple, Tuple *old_tuple,
+                            const RID &rid) {
+  uint32_t slot_idx = rid.GetSlotId();
+  if (slot_idx >= GetSlotCount())
+    return false;
+
+  uint32_t slot_offset = SIZE_TABLE_PAGE_HEADER + (slot_idx * SIZE_SLOT);
+  uint32_t tuple_offset;
+  std::memcpy(&tuple_offset, GetData() + slot_offset, sizeof(uint32_t));
+  uint32_t tuple_size;
+  std::memcpy(&tuple_size, GetData() + slot_offset + 4, sizeof(uint32_t));
+
+  if (tuple_size == 0 || (tuple_size & DELETE_MASK)) {
+    return false;
+  }
+
+  // Preserve old tuple for WAL
+  if (old_tuple != nullptr) {
+    old_tuple->DeserializeFrom(GetData() + tuple_offset, tuple_size);
+    old_tuple->SetRid(rid);
+  }
+
+  uint32_t new_size = new_tuple.GetSize();
+
+  // 1. In-place overwrite (perfect fit or shrinking)
+  if (new_size <= tuple_size) {
+    new_tuple.SerializeTo(GetData() + tuple_offset);
+    if (new_size < tuple_size) {
+      SetSlot(slot_idx, tuple_offset, new_size);
+    }
+    return true;
+  }
+
+  // 2. Out-of-place update on the same page (growing)
+  // First, logically orphan the old bytes without triggering DELETE_MASK
+  // We do this by zeroing them in the compaction logic implicitly:
+  // since the offset changes, those byte areas become unreachable dead space.
+
+  if (GetFreeSpaceRemaining() < new_size) {
+    // Temporarily erase the old slot size so compaction claims its space
+    SetSlot(slot_idx, 0, 0);
+    Compact();
+
+    // Check if compaction freed enough
+    if (GetFreeSpaceRemaining() < new_size) {
+      // Restore the slot pointer if we failed to find space
+      SetSlot(slot_idx, tuple_offset, tuple_size);
+      return false;
+    }
+  }
+
+  // Allocate new contiguous space
+  uint32_t free_ptr = GetFreeSpacePointer();
+  uint32_t new_free_ptr = free_ptr - new_size;
+  new_tuple.SerializeTo(GetData() + new_free_ptr);
+
+  // Update Metadata
+  SetSlot(slot_idx, new_free_ptr, new_size);
+  SetFreeSpacePointer(new_free_ptr);
+
+  return true;
+}
+
 bool TablePage::RollbackDelete(const RID &rid, const Tuple &tuple) {
   uint32_t slot_idx = rid.GetSlotId();
   if (slot_idx >= GetSlotCount())

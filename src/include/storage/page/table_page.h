@@ -8,7 +8,6 @@
 #include "storage/table/tuple.h"
 #include <cstring>
 
-
 namespace tetodb {
 
 static constexpr size_t OFFSET_PAGE_ID = 0;
@@ -34,6 +33,7 @@ public:
   bool MarkDelete(const RID &rid);
   bool ApplyDelete(const RID &rid);
   bool GetTuple(const RID &rid, Tuple *tuple);
+  bool UpdateTuple(const Tuple &new_tuple, Tuple *old_tuple, const RID &rid);
   bool RollbackDelete(const RID &rid, const Tuple &tuple);
 
   // Physically defragments the page to reclaim dead space
