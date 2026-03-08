@@ -107,6 +107,12 @@ void TransactionManager::Abort(Transaction *txn) {
     txn->SetPrevLSN(lsn);
   }
 
+  // --- CORE FIX (Bug 14): Prevent Double Undo ---
+  // Erase the operation lists so that any subsequent calls to Abort()
+  // on this same transaction instantly become harmless no-ops.
+  txn->GetIndexWriteSet()->clear();
+  txn->GetWriteSet()->clear();
+
   ReleaseLocks(txn);
   GarbageCollect(txn->GetTransactionId());
 }
