@@ -307,11 +307,13 @@ std::vector<IndexMetadata *> Catalog::GetTableIndexes(table_oid_t table_oid) {
   return {};
 }
 
-void Catalog::AddForeignKey(table_oid_t child_table_oid, const ForeignKey &fk) {
+bool Catalog::AddForeignKey(table_oid_t child_table_oid, const ForeignKey &fk) {
   std::unique_lock<std::mutex> lock(latch_);
   if (tables_.find(child_table_oid) != tables_.end()) {
     tables_[child_table_oid]->foreign_keys_.push_back(fk);
+    return true;
   }
+  return false;
 }
 
 void Catalog::PopulateIndex(TableMetadata *table_meta,
@@ -429,17 +431,29 @@ bool Catalog::DropIndex(const std::string &index_name) {
 bool Catalog::CreateView(const std::string &view_name,
                          std::unique_ptr<SelectStatement> query) {
   std::lock_guard<std::mutex> lock(latch_);
-  if (views_.find(view_name) != views_.end()) {
+  if (view_names_.find(view_name) != view_names_.end()) {
     return false; // View already exists
   }
-  views_[view_name] =
-      std::make_unique<ViewMetadata>(view_name, std::move(query));
+
+  view_oid_t view_oid = next_view_oid_++;
+  views_[view_oid] =
+      std::make_unique<ViewMetadata>(view_name, std::move(query), view_oid);
+  view_names_[view_name] = view_oid;
   return true;
 }
 
 ViewMetadata *Catalog::GetView(const std::string &view_name) {
   std::lock_guard<std::mutex> lock(latch_);
-  auto it = views_.find(view_name);
+  auto it = view_names_.find(view_name);
+  if (it == view_names_.end()) {
+    return nullptr;
+  }
+  return views_[it->second].get();
+}
+
+ViewMetadata *Catalog::GetView(view_oid_t view_oid) {
+  std::lock_guard<std::mutex> lock(latch_);
+  auto it = views_.find(view_oid);
   if (it == views_.end()) {
     return nullptr;
   }
@@ -448,11 +462,14 @@ ViewMetadata *Catalog::GetView(const std::string &view_name) {
 
 bool Catalog::DropView(const std::string &view_name) {
   std::lock_guard<std::mutex> lock(latch_);
-  auto it = views_.find(view_name);
-  if (it == views_.end()) {
+  auto it = view_names_.find(view_name);
+  if (it == view_names_.end()) {
     return false; // View not found
   }
-  views_.erase(it);
+
+  view_oid_t view_oid = it->second;
+  views_.erase(view_oid);
+  view_names_.erase(it);
   return true;
 }
 

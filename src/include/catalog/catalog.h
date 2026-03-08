@@ -14,7 +14,7 @@
 #include "index/b_plus_tree_index.h"
 #include "index/index.h"
 #include "parser/ast.h"
-#include "recovery/log_manager.h" // <-- NEW: Include LogManager
+#include "recovery/log_manager.h"
 #include "storage/buffer/buffer_pool_manager.h"
 #include "storage/table/table_heap.h"
 
@@ -24,6 +24,7 @@ class Transaction; // Forward declaration
 
 using table_oid_t = uint32_t;
 using index_oid_t = uint32_t;
+using view_oid_t = uint32_t;
 
 /**
  * ForeignKey maps a set of columns in a Child table to a set of columns in a
@@ -71,28 +72,29 @@ struct TableMetadata {
 struct IndexMetadata {
   IndexMetadata(std::string name, table_oid_t table_oid,
                 std::unique_ptr<Index> index, index_oid_t oid,
-                std::vector<uint32_t> key_attrs, bool is_unique) // <-- ADDED
+                std::vector<uint32_t> key_attrs, bool is_unique)
       : name_(std::move(name)), table_oid_(table_oid), index_(std::move(index)),
-        oid_(oid), key_attrs_(std::move(key_attrs)), is_unique_(is_unique) {
-  } // <-- ADDED
+        oid_(oid), key_attrs_(std::move(key_attrs)), is_unique_(is_unique) {}
 
   std::string name_;
   table_oid_t table_oid_;
   std::unique_ptr<Index> index_;
   index_oid_t oid_;
   std::vector<uint32_t> key_attrs_;
-  bool is_unique_; // <-- ADDED
+  bool is_unique_;
 };
 
 /**
  * ViewMetadata: A container for view AST logic.
  */
 struct ViewMetadata {
-  ViewMetadata(std::string name, std::unique_ptr<SelectStatement> query)
-      : name_(std::move(name)), view_query_(std::move(query)) {}
+  ViewMetadata(std::string name, std::unique_ptr<SelectStatement> query,
+               view_oid_t oid)
+      : name_(std::move(name)), view_query_(std::move(query)), oid_(oid) {}
 
   std::string name_;
   std::unique_ptr<SelectStatement> view_query_;
+  view_oid_t oid_;
 };
 
 /**
@@ -100,7 +102,6 @@ struct ViewMetadata {
  */
 class Catalog {
 public:
-  // UPDATED: Added LogManager pointer with a default nullptr
   explicit Catalog(const std::string &catalog_path, BufferPoolManager *bpm,
                    LogManager *log_manager = nullptr)
       : catalog_path_(catalog_path), bpm_(bpm), log_manager_(log_manager) {}
@@ -117,21 +118,19 @@ public:
   IndexMetadata *CreateIndex(const std::string &index_name,
                              table_oid_t table_oid,
                              const std::vector<uint32_t> &key_attrs,
-                             bool is_unique, // <-- ADDED
-                             Transaction *txn,
+                             bool is_unique, Transaction *txn,
                              page_id_t root_page_id = INVALID_PAGE_ID);
 
   IndexMetadata *CreateIndex(const std::string &index_name,
                              const std::string &table_name,
                              const std::vector<std::string> &column_names,
-                             bool is_unique, // <-- ADDED
-                             Transaction *txn);
+                             bool is_unique, Transaction *txn);
 
   IndexMetadata *GetIndex(const std::string &index_name);
   IndexMetadata *GetIndex(index_oid_t index_oid);
   std::vector<IndexMetadata *> GetTableIndexes(table_oid_t table_oid);
 
-  void AddForeignKey(table_oid_t child_table_oid, const ForeignKey &fk);
+  bool AddForeignKey(table_oid_t child_table_oid, const ForeignKey &fk);
 
   bool DropTable(const std::string &table_name);
   bool DropIndex(const std::string &index_name);
@@ -139,6 +138,7 @@ public:
   bool CreateView(const std::string &view_name,
                   std::unique_ptr<SelectStatement> query);
   ViewMetadata *GetView(const std::string &view_name);
+  ViewMetadata *GetView(view_oid_t view_oid);
   bool DropView(const std::string &view_name);
 
   void SaveCatalog(const std::string &file_path);
@@ -152,7 +152,7 @@ private:
 private:
   std::string catalog_path_;
   BufferPoolManager *bpm_;
-  LogManager *log_manager_; // <-- NEW: Store the LogManager pointer
+  LogManager *log_manager_;
   std::mutex latch_;
 
   std::atomic<table_oid_t> next_table_oid_{0};
@@ -164,7 +164,9 @@ private:
   std::unordered_map<table_oid_t, std::vector<IndexMetadata *>> table_indexes_;
   std::unordered_map<std::string, index_oid_t> index_names_;
 
-  std::unordered_map<std::string, std::unique_ptr<ViewMetadata>> views_;
+  std::atomic<view_oid_t> next_view_oid_{0};
+  std::unordered_map<view_oid_t, std::unique_ptr<ViewMetadata>> views_;
+  std::unordered_map<std::string, view_oid_t> view_names_;
 };
 
 } // namespace tetodb

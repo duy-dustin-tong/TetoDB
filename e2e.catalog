@@ -1,30 +1,4 @@
-TABLE employees 0
-COLUMN id 4
-COLUMN name 7
-COLUMN salary 4
-COLUMN department 7
-END
-TABLE projects 2
-COLUMN proj_id 4
-COLUMN emp_id 4
-COLUMN proj_name 7
-END
-TABLE isolation_test 0
+TABLE recovery_test 0
 COLUMN id 4
 COLUMN val 7
 END
-TABLE parent_table 4
-COLUMN id 4
-COLUMN data 7
-END
-TABLE child_table 5
-COLUMN c_id 4
-COLUMN p_id 4
-END
-TABLE phantom_test 10
-COLUMN id 4
-COLUMN val 4
-END
-INDEX pk_phantom_test 6 -1 1 1 0 
-INDEX idx_val 6 -1 1 0 1 
-FK child_table fk_child_table_parent_table parent_table 1 0 0 0

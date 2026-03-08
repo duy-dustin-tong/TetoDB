@@ -7,19 +7,20 @@
 #include <string>
 #include <unordered_map>
 
-
+#include "recovery/log_manager.h"
 #include "recovery/log_record.h"
 #include "storage/buffer/buffer_pool_manager.h"
 #include "storage/disk/disk_manager.h"
 #include "storage/page/table_page.h"
+
 
 namespace tetodb {
 
 class RecoveryManager {
 public:
   RecoveryManager(DiskManager *disk_manager, BufferPoolManager *bpm,
-                  const std::string &db_file_name)
-      : disk_manager_(disk_manager), bpm_(bpm) {
+                  LogManager *log_mgr, const std::string &db_file_name)
+      : disk_manager_(disk_manager), bpm_(bpm), log_mgr_(log_mgr) {
 
     // Reconstruct the log file name from the DB name
     std::filesystem::path path(db_file_name);
@@ -45,6 +46,7 @@ public:
 private:
   DiskManager *disk_manager_;
   BufferPoolManager *bpm_;
+  LogManager *log_mgr_;
   std::string log_file_name_;
 
   // --- ACTIVE TRANSACTION TABLE (ATT) ---

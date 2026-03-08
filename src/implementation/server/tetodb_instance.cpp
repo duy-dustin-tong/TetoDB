@@ -36,12 +36,17 @@ TetoDBInstance::TetoDBInstance(const std::string &db_file_name) {
   log_mgr_ = std::make_unique<LogManager>(disk_manager_.get());
 
   // ARIES Recovery
-  RecoveryManager recovery_mgr(disk_manager_.get(), bpm_.get(), db_file_name);
+  RecoveryManager recovery_mgr(disk_manager_.get(), bpm_.get(), log_mgr_.get(),
+                               db_file_name);
   recovery_mgr.Redo();
+
+  // Start log flush thread BEFORE Undo, so CLRs emitted during Undo can be
+  // flushed
+  log_mgr_->RunFlushThread();
+
   recovery_mgr.Undo();
   bool needs_index_rebuild = recovery_mgr.DidWork();
 
-  log_mgr_->RunFlushThread();
   lock_mgr_ = std::make_unique<LockManager>();
   txn_mgr_ =
       std::make_unique<TransactionManager>(lock_mgr_.get(), log_mgr_.get());
