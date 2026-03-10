@@ -565,7 +565,7 @@ std::unique_ptr<Expr> Parser::ParseNotExpression() {
 }
 
 std::unique_ptr<Expr> Parser::ParseComparisonExpression() {
-  auto left = ParseBaseExpression();
+  auto left = ParseAdditiveExpression();
 
   if (Peek().type_ == TokenType::SYMBOL &&
       (Peek().value_ == "=" || Peek().value_ == ">" || Peek().value_ == "<" ||
@@ -573,7 +573,7 @@ std::unique_ptr<Expr> Parser::ParseComparisonExpression() {
        Peek().value_ == "!=")) {
 
     std::string op = Advance().value_;
-    auto right = ParseBaseExpression();
+    auto right = ParseAdditiveExpression();
     left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
   }
 
@@ -593,7 +593,7 @@ std::unique_ptr<Expr> Parser::ParseComparisonExpression() {
   if (Peek().type_ == TokenType::KEYWORD &&
       (Peek().value_ == "LIKE" || Peek().value_ == "ILIKE")) {
     std::string op = Advance().value_;
-    auto right = ParseBaseExpression();
+    auto right = ParseAdditiveExpression();
     left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
 
     if (is_not_like) {
@@ -649,9 +649,9 @@ std::unique_ptr<Expr> Parser::ParseComparisonExpression() {
 
   if (Peek().type_ == TokenType::KEYWORD && Peek().value_ == "BETWEEN") {
     Advance();
-    auto lower = ParseBaseExpression();
+    auto lower = ParseAdditiveExpression();
     Consume(TokenType::KEYWORD, "AND");
-    auto upper = ParseBaseExpression();
+    auto upper = ParseAdditiveExpression();
     return std::make_unique<BetweenExpr>(std::move(left), std::move(lower),
                                          std::move(upper), is_not);
   }
@@ -662,6 +662,40 @@ std::unique_ptr<Expr> Parser::ParseComparisonExpression() {
   }
 
   return left;
+}
+
+std::unique_ptr<Expr> Parser::ParseAdditiveExpression() {
+  auto left = ParseMultiplicativeExpression();
+  while (Peek().type_ == TokenType::SYMBOL &&
+         (Peek().value_ == "+" || Peek().value_ == "-")) {
+    std::string op = Advance().value_;
+    auto right = ParseMultiplicativeExpression();
+    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
+  }
+  return left;
+}
+
+std::unique_ptr<Expr> Parser::ParseMultiplicativeExpression() {
+  auto left = ParseUnaryExpression();
+  while (Peek().type_ == TokenType::SYMBOL &&
+         (Peek().value_ == "*" || Peek().value_ == "/")) {
+    std::string op = Advance().value_;
+    auto right = ParseUnaryExpression();
+    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
+  }
+  return left;
+}
+
+std::unique_ptr<Expr> Parser::ParseUnaryExpression() {
+  if (Peek().type_ == TokenType::SYMBOL && Peek().value_ == "-") {
+    Advance(); // consume '-'
+    auto operand = ParseUnaryExpression();
+    // Represent -x as (0 - x)
+    auto zero = std::make_unique<ConstantExpr>("0");
+    return std::make_unique<BinaryExpr>(std::move(zero), "-",
+                                        std::move(operand));
+  }
+  return ParseBaseExpression();
 }
 
 std::unique_ptr<Expr> Parser::ParseBaseExpression() {
@@ -680,10 +714,6 @@ std::unique_ptr<Expr> Parser::ParseBaseExpression() {
   }
   if (Match(TokenType::KEYWORD, "FALSE")) {
     return std::make_unique<ConstantExpr>("FALSE");
-  }
-
-  if (Match(TokenType::SYMBOL, "*")) {
-    return std::make_unique<ColumnRefExpr>("", "*");
   }
 
   if (Match(TokenType::NUMBER)) {

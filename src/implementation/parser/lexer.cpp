@@ -146,7 +146,7 @@ Token Lexer::ReadSymbol() {
 
   // Validate basic single-character symbols
   if (c == '=' || c == '<' || c == '>' || c == '*' || c == ',' || c == '(' ||
-      c == ')' || c == ';' || c == '.') {
+      c == ')' || c == ';' || c == '.' || c == '+' || c == '-' || c == '/') {
     return {TokenType::SYMBOL, value};
   }
 

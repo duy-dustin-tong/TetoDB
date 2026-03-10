@@ -88,6 +88,9 @@ target_link_libraries(test_bug18_bpm_eviction tetodb_lib)
 add_executable(test_bug19_fk_cascade src/test_bug19_fk_cascade.cpp)
 target_link_libraries(test_bug19_fk_cascade tetodb_lib)
 
+add_executable(test_bug20_arithmetic src/test_bug20_arithmetic.cpp)
+target_link_libraries(test_bug20_arithmetic tetodb_lib)
+
 add_executable(test_bug7 "src/test_bug7_compaction.cpp")
 target_link_libraries(test_bug7 tetodb_lib)
 

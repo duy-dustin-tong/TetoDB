@@ -4,6 +4,7 @@
 
 #include "planner/planner.h"
 #include "execution/execution_engine.h"
+#include "execution/expressions/arithmetic_expression.h"
 #include "execution/expressions/column_value_expression.h"
 #include "execution/expressions/comparison_expression.h"
 #include "execution/expressions/constant_value_expression.h"
@@ -659,6 +660,19 @@ std::unique_ptr<AbstractExpression> Planner::PlanExpression(
     auto left = PlanExpression(bin_expr->left_.get(), schema, alias_map);
     auto right = PlanExpression(bin_expr->right_.get(), schema, alias_map);
 
+    // --- Arithmetic operators ---
+    static const std::unordered_map<std::string, ArithType> arith_map = {
+        {"+", ArithType::ADD},
+        {"-", ArithType::SUBTRACT},
+        {"*", ArithType::MULTIPLY},
+        {"/", ArithType::DIVIDE}};
+    auto arith_it = arith_map.find(bin_expr->op_);
+    if (arith_it != arith_map.end()) {
+      return std::make_unique<ArithmeticExpression>(
+          arith_it->second, std::move(left), std::move(right));
+    }
+
+    // --- Comparison operators ---
     static const std::unordered_map<std::string, CompType> comp_map = {
         {"=", CompType::EQUAL},
         {"<", CompType::LESS_THAN},

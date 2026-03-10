@@ -48,6 +48,9 @@ private:
   std::unique_ptr<Expr> ParseAndExpression();
   std::unique_ptr<Expr> ParseNotExpression();
   std::unique_ptr<Expr> ParseComparisonExpression();
+  std::unique_ptr<Expr> ParseAdditiveExpression();
+  std::unique_ptr<Expr> ParseMultiplicativeExpression();
+  std::unique_ptr<Expr> ParseUnaryExpression();
   std::unique_ptr<Expr> ParseBaseExpression(); // Handles columns and numbers
   std::unique_ptr<TableRef> ParseTableRef();
   std::unique_ptr<JoinNode> ParseJoin();
