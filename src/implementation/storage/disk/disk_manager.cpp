@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <vector>
 
-
 namespace tetodb {
 
 DiskManager::DiskManager(std::filesystem::path db_file)
@@ -91,7 +90,7 @@ DiskManager::~DiskManager() {
   }
 }
 
-void DiskManager::WritePage(page_id_t page_id, const char *page_data) {
+bool DiskManager::WritePage(page_id_t page_id, const char *page_data) {
   std::scoped_lock<std::mutex> lock(latch_);
 
   db_io_.clear();
@@ -104,7 +103,9 @@ void DiskManager::WritePage(page_id_t page_id, const char *page_data) {
   if (db_io_.fail()) {
     std::cerr << "[DISK ERROR] Write/Flush failed for Page " << page_id
               << std::endl;
+    return false;
   }
+  return true;
 }
 
 void DiskManager::ReadPage(page_id_t page_id, char *page_data) {

@@ -16,8 +16,7 @@ class DiskManager {
 public:
   explicit DiskManager(std::filesystem::path db_file);
   ~DiskManager();
-
-  void WritePage(page_id_t page_id, const char *page_data);
+  bool WritePage(page_id_t page_id, const char *page_data);
   void ReadPage(page_id_t page_id, char *page_data);
 
   // NEW: Write a raw byte buffer to the sequential log file
