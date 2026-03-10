@@ -76,6 +76,12 @@ add_executable(teto_main "src/server_main.cpp")
 # 4. Create the Client Executable
 add_executable(teto_client "src/client_main.cpp" "src/include/execution/expressions/parameter_value_expression.h")
 
+add_executable(test_bug16_like_microbenchmark src/test_bug16_like_microbenchmark.cpp)
+target_link_libraries(test_bug16_like_microbenchmark tetodb_lib)
+
+add_executable(test_bug17_div_microbenchmark src/test_bug17_div_microbenchmark.cpp)
+target_link_libraries(test_bug17_div_microbenchmark tetodb_lib)
+
 add_executable(test_bug7 "src/test_bug7_compaction.cpp")
 target_link_libraries(test_bug7 tetodb_lib)
 

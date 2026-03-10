@@ -104,8 +104,13 @@ Value Value::Divide(const Value &other) const {
 
   if (type_id_ == TypeId::DECIMAL || other.type_id_ == TypeId::DECIMAL)
     return Value(TypeId::DECIMAL, CastAsDouble() / divisor);
-  if (type_id_ == TypeId::BIGINT || other.type_id_ == TypeId::BIGINT)
+  if (type_id_ == TypeId::BIGINT || other.type_id_ == TypeId::BIGINT) {
+    if (other.CastAsBigInt() == 0)
+      throw std::runtime_error("Division by zero.");
     return Value(TypeId::BIGINT, CastAsBigInt() / other.CastAsBigInt());
+  }
+  if (other.CastAsInteger() == 0)
+    throw std::runtime_error("Division by zero.");
   return Value(TypeId::INTEGER, CastAsInteger() / other.CastAsInteger());
 }
 
@@ -336,7 +341,8 @@ bool Value::CompareGreaterThan(const Value &other) const {
 
 static bool MatchLikeStr(const char *str, const char *pattern,
                          bool case_insensitive) {
-  // If we reach the end of the pattern, we must also be at the end of the string
+  // If we reach the end of the pattern, we must also be at the end of the
+  // string
   if (*pattern == '\0') {
     return *str == '\0';
   }
@@ -347,8 +353,9 @@ static bool MatchLikeStr(const char *str, const char *pattern,
     while (*(pattern + 1) == '%') {
       pattern++;
     }
-    
-    // Try matching the rest of the pattern with decreasing lengths of the string
+
+    // Try matching the rest of the pattern with decreasing lengths of the
+    // string
     const char *s = str;
     while (true) {
       if (MatchLikeStr(s, pattern + 1, case_insensitive)) {
@@ -361,7 +368,8 @@ static bool MatchLikeStr(const char *str, const char *pattern,
     }
   }
 
-  // If the string is empty but the pattern isn't (and it's not a '%'), it's a mismatch
+  // If the string is empty but the pattern isn't (and it's not a '%'), it's a
+  // mismatch
   if (*str == '\0') {
     return false;
   }
