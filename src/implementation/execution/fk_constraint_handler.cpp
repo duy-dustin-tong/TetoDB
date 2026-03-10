@@ -34,26 +34,34 @@ void FKConstraintHandler::EnforceOnDelete(
         // FAST PATH: O(log N) Index Scan
         std::vector<Column> key_cols;
         std::vector<Value> key_vals;
-        for (uint32_t col_idx : fk.parent_key_attrs_) {
+        for (size_t i = 0; i < fk.parent_key_attrs_.size(); i++) {
           key_cols.push_back(
-              child_meta->schema_.GetColumn(fk.child_key_attrs_[0]));
-          key_vals.push_back(deleted_tuple.GetValue(parent_schema, col_idx));
+              child_meta->schema_.GetColumn(fk.child_key_attrs_[i]));
+          key_vals.push_back(
+              deleted_tuple.GetValue(parent_schema, fk.parent_key_attrs_[i]));
         }
         Schema key_schema(key_cols);
         Tuple search_key(key_vals, &key_schema);
         fk_index->index_->ScanKey(search_key, &dependent_rids, txn);
       } else {
         // SLOW PATH: O(N) Sequential Heap Scan
-        Value parent_val =
-            deleted_tuple.GetValue(parent_schema, fk.parent_key_attrs_[0]);
         auto child_iter = child_meta->table_->Begin(txn);
         while (child_iter != child_meta->table_->End()) {
           RID child_rid = child_iter.GetRid();
           Tuple child_tuple;
           if (child_meta->table_->GetTuple(child_rid, &child_tuple, txn)) {
-            Value child_val = child_tuple.GetValue(&child_meta->schema_,
-                                                   fk.child_key_attrs_[0]);
-            if (parent_val.CompareEquals(child_val)) {
+            bool match = true;
+            for (size_t i = 0; i < fk.parent_key_attrs_.size(); i++) {
+              Value parent_val = deleted_tuple.GetValue(
+                  parent_schema, fk.parent_key_attrs_[i]);
+              Value child_val = child_tuple.GetValue(&child_meta->schema_,
+                                                     fk.child_key_attrs_[i]);
+              if (!parent_val.CompareEquals(child_val)) {
+                match = false;
+                break;
+              }
+            }
+            if (match) {
               dependent_rids.push_back(child_rid);
             }
           }
@@ -104,6 +112,9 @@ void FKConstraintHandler::EnforceOnDelete(
                                      child_idx->index_.get());
             txn->AppendIndexWriteRecord(idx_rec);
           }
+          // Recursive Cascade: propagate delete to grandchild tables
+          EnforceOnDelete(child_tuple, child_meta, catalog, txn,
+                          acquire_write_lock);
         }
       }
 
@@ -120,7 +131,14 @@ void FKConstraintHandler::EnforceOnDelete(
 
           std::vector<Value> c_new_values;
           for (uint32_t i = 0; i < child_meta->schema_.GetColumnCount(); ++i) {
-            if (i == fk.child_key_attrs_[0]) {
+            bool is_fk_col = false;
+            for (uint32_t fk_c_attr : fk.child_key_attrs_) {
+              if (i == fk_c_attr) {
+                is_fk_col = true;
+                break;
+              }
+            }
+            if (is_fk_col) {
               TypeId col_type = child_meta->schema_.GetColumn(i).GetTypeId();
               c_new_values.push_back(Value::GetNullValue(col_type));
             } else {
@@ -157,6 +175,9 @@ void FKConstraintHandler::EnforceOnDelete(
               txn->AppendIndexWriteRecord(c_idx_ins);
             }
           }
+          // Recursive Cascade: propagate update down to grandchild tables
+          EnforceOnUpdate(c_old_tuple, c_new_tuple, child_meta, catalog, txn,
+                          acquire_write_lock);
         }
       }
     }
@@ -176,12 +197,19 @@ void FKConstraintHandler::EnforceOnUpdate(
         continue;
 
       // Check if the referenced parent key actually changed
-      Value old_parent_val =
-          old_tuple.GetValue(parent_schema, fk.parent_key_attrs_[0]);
-      Value new_parent_val =
-          new_tuple.GetValue(parent_schema, fk.parent_key_attrs_[0]);
+      bool key_changed = false;
+      for (size_t i = 0; i < fk.parent_key_attrs_.size(); i++) {
+        Value old_parent_val =
+            old_tuple.GetValue(parent_schema, fk.parent_key_attrs_[i]);
+        Value new_parent_val =
+            new_tuple.GetValue(parent_schema, fk.parent_key_attrs_[i]);
+        if (!old_parent_val.CompareEquals(new_parent_val)) {
+          key_changed = true;
+          break;
+        }
+      }
 
-      if (old_parent_val.CompareEquals(new_parent_val))
+      if (!key_changed)
         continue; // Primary key didn't change, no cascade needed.
 
       // --- Find dependent rows ---
@@ -199,10 +227,11 @@ void FKConstraintHandler::EnforceOnUpdate(
       if (fk_index) {
         std::vector<Column> key_cols;
         std::vector<Value> key_vals;
-        for (uint32_t col_idx : fk.parent_key_attrs_) {
+        for (size_t i = 0; i < fk.parent_key_attrs_.size(); i++) {
           key_cols.push_back(
-              child_meta->schema_.GetColumn(fk.child_key_attrs_[0]));
-          key_vals.push_back(old_tuple.GetValue(parent_schema, col_idx));
+              child_meta->schema_.GetColumn(fk.child_key_attrs_[i]));
+          key_vals.push_back(
+              old_tuple.GetValue(parent_schema, fk.parent_key_attrs_[i]));
         }
         Schema key_schema(key_cols);
         Tuple search_key(key_vals, &key_schema);
@@ -213,9 +242,18 @@ void FKConstraintHandler::EnforceOnUpdate(
           RID child_rid = child_iter.GetRid();
           Tuple child_tuple;
           if (child_meta->table_->GetTuple(child_rid, &child_tuple, txn)) {
-            Value child_val = child_tuple.GetValue(&child_meta->schema_,
-                                                   fk.child_key_attrs_[0]);
-            if (old_parent_val.CompareEquals(child_val)) {
+            bool match = true;
+            for (size_t i = 0; i < fk.parent_key_attrs_.size(); i++) {
+              Value old_parent_val =
+                  old_tuple.GetValue(parent_schema, fk.parent_key_attrs_[i]);
+              Value child_val = child_tuple.GetValue(&child_meta->schema_,
+                                                     fk.child_key_attrs_[i]);
+              if (!old_parent_val.CompareEquals(child_val)) {
+                match = false;
+                break;
+              }
+            }
+            if (match) {
               dependent_rids.push_back(child_rid);
             }
           }
@@ -249,12 +287,22 @@ void FKConstraintHandler::EnforceOnUpdate(
 
           std::vector<Value> c_new_values;
           for (uint32_t i = 0; i < child_meta->schema_.GetColumnCount(); ++i) {
-            if (i == fk.child_key_attrs_[0]) {
+            int tuple_fk_idx = -1;
+            for (size_t j = 0; j < fk.child_key_attrs_.size(); j++) {
+              if (fk.child_key_attrs_[j] == i) {
+                tuple_fk_idx = static_cast<int>(j);
+                break;
+              }
+            }
+
+            if (tuple_fk_idx != -1) {
               if (fk.on_update_ == ReferentialAction::SET_NULL) {
                 TypeId col_type = child_meta->schema_.GetColumn(i).GetTypeId();
                 c_new_values.push_back(Value::GetNullValue(col_type));
               } else {
                 // CASCADE
+                Value new_parent_val = new_tuple.GetValue(
+                    parent_schema, fk.parent_key_attrs_[tuple_fk_idx]);
                 c_new_values.push_back(new_parent_val);
               }
             } else {
@@ -297,6 +345,9 @@ void FKConstraintHandler::EnforceOnUpdate(
               txn->AppendIndexWriteRecord(c_idx_ins);
             }
           }
+          // Recursive Cascade: propagate update down to grandchild tables
+          EnforceOnUpdate(c_old_tuple, c_new_tuple, child_meta, catalog, txn,
+                          acquire_write_lock);
         }
       }
     }
