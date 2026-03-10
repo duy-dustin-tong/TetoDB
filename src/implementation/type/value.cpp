@@ -334,40 +334,57 @@ bool Value::CompareGreaterThan(const Value &other) const {
   return false;
 }
 
-static std::string SqlLikeToRegex(const std::string &sql_pattern) {
-  std::string regex_str = "^";
-  for (char c : sql_pattern) {
-    switch (c) {
-    case '%':
-      regex_str += ".*";
-      break;
-    case '_':
-      regex_str += ".";
-      break;
-    case '\\':
-    case '^':
-    case '$':
-    case '.':
-    case '|':
-    case '?':
-    case '*':
-    case '+':
-    case '(':
-    case ')':
-    case '[':
-    case ']':
-    case '{':
-    case '}':
-      regex_str += "\\";
-      regex_str += c;
-      break;
-    default:
-      regex_str += c;
-      break;
+static bool MatchLikeStr(const char *str, const char *pattern,
+                         bool case_insensitive) {
+  // If we reach the end of the pattern, we must also be at the end of the string
+  if (*pattern == '\0') {
+    return *str == '\0';
+  }
+
+  // Handle '%' wildcard: matches zero or more characters
+  if (*pattern == '%') {
+    // Skip consecutive '%' signs to avoid redundant recursion
+    while (*(pattern + 1) == '%') {
+      pattern++;
+    }
+    
+    // Try matching the rest of the pattern with decreasing lengths of the string
+    const char *s = str;
+    while (true) {
+      if (MatchLikeStr(s, pattern + 1, case_insensitive)) {
+        return true;
+      }
+      if (*s == '\0') {
+        return false;
+      }
+      s++;
     }
   }
-  regex_str += "$";
-  return regex_str;
+
+  // If the string is empty but the pattern isn't (and it's not a '%'), it's a mismatch
+  if (*str == '\0') {
+    return false;
+  }
+
+  // Handle '_' wildcard: matches exactly one arbitrary character
+  if (*pattern == '_') {
+    return MatchLikeStr(str + 1, pattern + 1, case_insensitive);
+  }
+
+  // Handle exact character matches (with optional case-insensitivity)
+  bool char_match = false;
+  if (case_insensitive) {
+    char_match = std::tolower(static_cast<unsigned char>(*str)) ==
+                 std::tolower(static_cast<unsigned char>(*pattern));
+  } else {
+    char_match = (*str == *pattern);
+  }
+
+  if (char_match) {
+    return MatchLikeStr(str + 1, pattern + 1, case_insensitive);
+  }
+
+  return false;
 }
 
 bool Value::CompareLike(const Value &other) const {
@@ -382,13 +399,7 @@ bool Value::CompareLike(const Value &other) const {
         "LIKE operator requires a string on the right side.");
   }
 
-  std::string regex_str = SqlLikeToRegex(other.str_value_);
-  try {
-    std::regex pattern(regex_str);
-    return std::regex_match(str_value_, pattern);
-  } catch (const std::regex_error &e) {
-    throw std::runtime_error("Invalid LIKE pattern: " + other.str_value_);
-  }
+  return MatchLikeStr(str_value_.c_str(), other.str_value_.c_str(), false);
 }
 
 bool Value::CompareILike(const Value &other) const {
@@ -403,13 +414,7 @@ bool Value::CompareILike(const Value &other) const {
         "ILIKE operator requires a string on the right side.");
   }
 
-  std::string regex_str = SqlLikeToRegex(other.str_value_);
-  try {
-    std::regex pattern(regex_str, std::regex_constants::icase);
-    return std::regex_match(str_value_, pattern);
-  } catch (const std::regex_error &e) {
-    throw std::runtime_error("Invalid ILIKE pattern: " + other.str_value_);
-  }
+  return MatchLikeStr(str_value_.c_str(), other.str_value_.c_str(), true);
 }
 
 // ==========================================================
