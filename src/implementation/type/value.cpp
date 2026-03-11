@@ -98,19 +98,24 @@ Value Value::Multiply(const Value &other) const {
 Value Value::Divide(const Value &other) const {
   if (is_null_ || other.is_null_)
     return Value::GetNullValue(type_id_);
-  double divisor = other.CastAsDouble();
-  if (divisor == 0)
-    throw std::runtime_error("Division by zero.");
+
+  // --- M6 FIX: Consolidate division by zero checks safely using native types ---
+  bool is_zero = false;
+  switch (other.type_id_) {
+  case TypeId::TINYINT:  is_zero = (other.val_.tinyint_ == 0); break;
+  case TypeId::SMALLINT: is_zero = (other.val_.smallint_ == 0); break;
+  case TypeId::INTEGER:  is_zero = (other.val_.integer_ == 0); break;
+  case TypeId::BIGINT:   is_zero = (other.val_.bigint_ == 0); break;
+  case TypeId::DECIMAL:  is_zero = (other.val_.decimal_ == 0.0); break;
+  default: break;
+  }
+  if (is_zero) throw std::runtime_error("Division by zero.");
 
   if (type_id_ == TypeId::DECIMAL || other.type_id_ == TypeId::DECIMAL)
-    return Value(TypeId::DECIMAL, CastAsDouble() / divisor);
+    return Value(TypeId::DECIMAL, CastAsDouble() / other.CastAsDouble());
   if (type_id_ == TypeId::BIGINT || other.type_id_ == TypeId::BIGINT) {
-    if (other.CastAsBigInt() == 0)
-      throw std::runtime_error("Division by zero.");
     return Value(TypeId::BIGINT, CastAsBigInt() / other.CastAsBigInt());
   }
-  if (other.CastAsInteger() == 0)
-    throw std::runtime_error("Division by zero.");
   return Value(TypeId::INTEGER, CastAsInteger() / other.CastAsInteger());
 }
 
