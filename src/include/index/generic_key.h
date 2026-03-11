@@ -97,19 +97,25 @@ public:
       int8_t l, r;
       std::memcpy(&l, lhs.data_, sizeof(int8_t));
       std::memcpy(&r, rhs.data_, sizeof(int8_t));
-      return l - r;
+      if (l < r) return -1;
+      if (l > r) return 1;
+      return 0;
     }
     case TypeId::SMALLINT: {
       int16_t l, r;
       std::memcpy(&l, lhs.data_, sizeof(int16_t));
       std::memcpy(&r, rhs.data_, sizeof(int16_t));
-      return l - r;
+      if (l < r) return -1;
+      if (l > r) return 1;
+      return 0;
     }
     case TypeId::INTEGER: {
       int32_t l, r;
       std::memcpy(&l, lhs.data_, sizeof(int32_t));
       std::memcpy(&r, rhs.data_, sizeof(int32_t));
-      return l - r;
+      if (l < r) return -1;
+      if (l > r) return 1;
+      return 0;
     }
     case TypeId::BIGINT: {
       int64_t l, r;
