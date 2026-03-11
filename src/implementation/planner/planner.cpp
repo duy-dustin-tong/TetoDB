@@ -1,7 +1,5 @@
 // planner.cpp
 
-// planner.cpp
-
 #include "planner/planner.h"
 #include "execution/execution_engine.h"
 #include "execution/expressions/arithmetic_expression.h"
