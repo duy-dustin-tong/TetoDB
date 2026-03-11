@@ -7,7 +7,8 @@ namespace tetodb {
 
 void FKConstraintHandler::EnforceOnDelete(
     const Tuple &deleted_tuple, TableMetadata *parent_table, Catalog *catalog,
-    Transaction *txn, const WriteLockFn &acquire_write_lock) {
+    Transaction *txn, const WriteLockFn &acquire_write_lock,
+    LockManager *lock_mgr) {
 
   const Schema *parent_schema = &parent_table->schema_;
 
@@ -114,7 +115,7 @@ void FKConstraintHandler::EnforceOnDelete(
           }
           // Recursive Cascade: propagate delete to grandchild tables
           EnforceOnDelete(child_tuple, child_meta, catalog, txn,
-                          acquire_write_lock);
+                          acquire_write_lock, lock_mgr);
         }
       }
 
@@ -149,7 +150,7 @@ void FKConstraintHandler::EnforceOnDelete(
           Tuple c_new_tuple(c_new_values, &child_meta->schema_);
           RID c_new_rid = child_rid;
 
-          if (child_meta->table_->UpdateTuple(c_new_tuple, &c_new_rid, txn)) {
+          if (child_meta->table_->UpdateTuple(c_new_tuple, &c_new_rid, txn, lock_mgr)) {
             for (auto *c_idx : child_indexes) {
               std::vector<Column> c_key_cols;
               std::vector<Value> c_old_kvals, c_new_kvals;
@@ -177,7 +178,7 @@ void FKConstraintHandler::EnforceOnDelete(
           }
           // Recursive Cascade: propagate update down to grandchild tables
           EnforceOnUpdate(c_old_tuple, c_new_tuple, child_meta, catalog, txn,
-                          acquire_write_lock);
+                          acquire_write_lock, lock_mgr);
         }
       }
     }
@@ -186,7 +187,8 @@ void FKConstraintHandler::EnforceOnDelete(
 
 void FKConstraintHandler::EnforceOnUpdate(
     const Tuple &old_tuple, const Tuple &new_tuple, TableMetadata *parent_table,
-    Catalog *catalog, Transaction *txn, const WriteLockFn &acquire_write_lock) {
+    Catalog *catalog, Transaction *txn, const WriteLockFn &acquire_write_lock,
+    LockManager *lock_mgr) {
 
   const Schema *parent_schema = &parent_table->schema_;
   auto all_tables = catalog->GetAllTables();
@@ -314,7 +316,7 @@ void FKConstraintHandler::EnforceOnUpdate(
           Tuple c_new_tuple(c_new_values, &child_meta->schema_);
           RID c_new_rid = child_rid;
 
-          if (child_meta->table_->UpdateTuple(c_new_tuple, &c_new_rid, txn)) {
+          if (child_meta->table_->UpdateTuple(c_new_tuple, &c_new_rid, txn, lock_mgr)) {
             if (c_new_rid != child_rid && !acquire_write_lock(c_new_rid)) {
               throw std::runtime_error("Transaction Aborted: Failed to acquire "
                                        "Exclusive Lock on relocated tuple.");
@@ -347,7 +349,7 @@ void FKConstraintHandler::EnforceOnUpdate(
           }
           // Recursive Cascade: propagate update down to grandchild tables
           EnforceOnUpdate(c_old_tuple, c_new_tuple, child_meta, catalog, txn,
-                          acquire_write_lock);
+                          acquire_write_lock, lock_mgr);
         }
       }
     }

@@ -52,7 +52,7 @@ bool DeleteExecutor::Next(Tuple *tuple, RID *rid) {
   // 2. ENFORCE FK ON DELETE CONSTRAINTS (CASCADE/RESTRICT/SET_NULL)
   // ==========================================
   FKConstraintHandler::EnforceOnDelete(to_delete, table_info_, catalog, txn,
-                                       acquire_write_lock);
+                                       acquire_write_lock, lock_mgr);
 
   // ==========================================
   // 3. PHYSICAL DELETION OF TARGET ROW

@@ -181,7 +181,7 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
     // ==========================================
     FKConstraintHandler::EnforceOnUpdate(current_old_tuple, new_tuple,
                                          table_info_, catalog, txn,
-                                         acquire_write_lock);
+                                         acquire_write_lock, lock_mgr);
 
     // ==========================================
     // 4. PHYSICAL UPDATE & LOGGING OF TARGET ROW

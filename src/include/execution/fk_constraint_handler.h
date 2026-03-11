@@ -21,7 +21,8 @@ public:
   static void EnforceOnDelete(const Tuple &deleted_tuple,
                               TableMetadata *parent_table, Catalog *catalog,
                               Transaction *txn,
-                              const WriteLockFn &acquire_write_lock);
+                              const WriteLockFn &acquire_write_lock,
+                              LockManager *lock_mgr = nullptr);
 
   // Enforce ON UPDATE constraints for all child tables referencing
   // parent_table. Handles RESTRICT (throws), CASCADE (updates children),
@@ -29,7 +30,8 @@ public:
   static void EnforceOnUpdate(const Tuple &old_tuple, const Tuple &new_tuple,
                               TableMetadata *parent_table, Catalog *catalog,
                               Transaction *txn,
-                              const WriteLockFn &acquire_write_lock);
+                              const WriteLockFn &acquire_write_lock,
+                              LockManager *lock_mgr = nullptr);
 };
 
 } // namespace tetodb
