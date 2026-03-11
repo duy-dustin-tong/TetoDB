@@ -474,6 +474,7 @@ bool Catalog::DropView(const std::string &view_name) {
 }
 
 void Catalog::SaveCatalog(const std::string &file_path) {
+  if (is_loading_) return;
   std::lock_guard<std::mutex> lock(latch_);
   std::ofstream out(file_path);
 
@@ -518,6 +519,13 @@ void Catalog::SaveCatalog(const std::string &file_path) {
 
 void Catalog::LoadCatalog(const std::string &file_path,
                           bool force_index_rebuild) {
+  struct LoadingGuard {
+    bool &flag_;
+    LoadingGuard(bool &flag) : flag_(flag) { flag_ = true; }
+    ~LoadingGuard() { flag_ = false; }
+  };
+  LoadingGuard guard(is_loading_);
+
   std::ifstream in(file_path);
   if (!in.is_open())
     return;
@@ -592,6 +600,13 @@ void Catalog::LoadCatalog(const std::string &file_path,
                   std::vector<uint32_t>{}, std::vector<uint32_t>{},
                   std::vector<ForeignKeyDef>{});
     }
+  }
+
+  if (force_index_rebuild) {
+    // The flag is still true here, but we can temporarily disable it to allow saving
+    is_loading_ = false;
+    SaveCatalog(file_path);
+    is_loading_ = true;
   }
 }
 
