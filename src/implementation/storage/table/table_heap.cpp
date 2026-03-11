@@ -109,8 +109,11 @@ bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn,
 
     new_guard.MarkDirty();
 
+    // Capture the old last_page_id_ BEFORE mutation for the WAL log
+    page_id_t prev_last_page_id;
     {
       std::lock_guard<std::mutex> lock(latch_);
+      prev_last_page_id = last_page_id_;
       last_page_id_ = new_page_id;
       fsm_.Update(new_page_id, new_table_page->GetFreeSpaceRemaining());
     }
@@ -125,11 +128,11 @@ bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn,
 
     if (txn != nullptr && log_manager_ != nullptr) {
       LogRecord page_log(txn->GetTransactionId(), txn->GetPrevLSN(),
-                         LogRecordType::NEWPAGE, last_page_id_, new_page_id);
+                         LogRecordType::NEWPAGE, prev_last_page_id, new_page_id);
       lsn_t page_lsn = log_manager_->AppendLogRecord(&page_log);
       txn->SetPrevLSN(page_lsn);
-      if (last_page_id_ != INVALID_PAGE_ID) {
-        Page *last_page = bpm_->FetchPage(last_page_id_);
+      if (prev_last_page_id != INVALID_PAGE_ID) {
+        Page *last_page = bpm_->FetchPage(prev_last_page_id);
         if (last_page) {
           WritePageGuard last_guard(bpm_, last_page);
           last_guard.As<TablePage>()->SetLSN(page_lsn);
