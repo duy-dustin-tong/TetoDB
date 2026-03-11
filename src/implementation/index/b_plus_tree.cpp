@@ -510,6 +510,12 @@ INDEX_TEMPLATE_ARGUMENTS
 template <typename N> bool BPLUSTREE_TYPE::IsSafe(N *node, Operation op) {
   if (op == Operation::INSERT) {
     return node->GetSize() < node->GetMaxSize();
+  } else if (op == Operation::DELETE) {
+    // A deletion is only safe if it won't cause the node to underflow.
+    // If it underflows, a merge/redistribute is required, which alters the parent.
+    // To be safe, GetSize() must be strictly greater than GetMinSize().
+    // (If it's equal, a single delete drops it below the threshold!)
+    return node->GetSize() > node->GetMinSize();
   }
   return true;
 }
