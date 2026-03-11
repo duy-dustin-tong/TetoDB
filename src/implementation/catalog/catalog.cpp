@@ -360,6 +360,32 @@ bool Catalog::DropTable(const std::string &table_name) {
 
   table_oid_t table_oid = it->second;
 
+  // --- M10 FIX: Clean up outgoing Foreign Keys and their generated Indexes ---
+  if (tables_.find(table_oid) != tables_.end()) {
+    TableMetadata* this_table = tables_[table_oid].get();
+    for (const auto &fk : this_table->foreign_keys_) {
+      // Find and drop the auto-generated index for this FK
+      auto index_it = table_indexes_.find(table_oid);
+      if (index_it != table_indexes_.end()) {
+        auto &idx_list = index_it->second;
+        for (auto idx_list_it = idx_list.begin(); idx_list_it != idx_list.end(); ) {
+          IndexMetadata* idx_meta = *idx_list_it;
+          if (idx_meta->name_ == fk.fk_name_ + "_idx") {
+            idx_meta->index_->Destroy();
+            index_names_.erase(idx_meta->name_);
+            indexes_.erase(idx_meta->oid_);
+            idx_list_it = idx_list.erase(idx_list_it);
+          } else {
+            ++idx_list_it;
+          }
+        }
+      }
+    }
+    // We also need to clear foreign_keys_ to ensure serialization is clean
+    this_table->foreign_keys_.clear();
+  }
+
+  // Find incoming references to block dropping
   for (const auto &[other_oid, other_meta] : tables_) {
     if (other_oid == table_oid)
       continue;
@@ -509,8 +535,11 @@ void Catalog::SaveCatalog(const std::string &file_path) {
 
       if (!parent_name.empty()) {
         out << "FK " << meta->name_ << " " << fk.fk_name_ << " " << parent_name
-            << " " << fk.child_key_attrs_[0] << " " << fk.parent_key_attrs_[0]
-            << " " << static_cast<int>(fk.on_delete_) << " "
+            << " " << fk.child_key_attrs_.size() << " ";
+        for (uint32_t attr : fk.child_key_attrs_) out << attr << " ";
+        out << fk.parent_key_attrs_.size() << " ";
+        for (uint32_t attr : fk.parent_key_attrs_) out << attr << " ";
+        out << static_cast<int>(fk.on_delete_) << " "
             << static_cast<int>(fk.on_update_) << "\n";
       }
     }
@@ -575,19 +604,33 @@ void Catalog::LoadCatalog(const std::string &file_path,
       }
     } else if (token == "FK") {
       std::string child_table, fk_name, parent_table;
-      uint32_t child_col_idx, parent_col_idx;
+      int num_child_attrs, num_parent_attrs;
       int on_delete_int, on_update_int;
 
-      ss >> child_table >> fk_name >> parent_table >> child_col_idx >>
-          parent_col_idx >> on_delete_int >> on_update_int;
+      ss >> child_table >> fk_name >> parent_table;
+
+      ss >> num_child_attrs;
+      std::vector<uint32_t> c_attrs;
+      for (int i = 0; i < num_child_attrs; ++i) {
+        uint32_t attr;
+        ss >> attr;
+        c_attrs.push_back(attr);
+      }
+
+      ss >> num_parent_attrs;
+      std::vector<uint32_t> p_attrs;
+      for (int i = 0; i < num_parent_attrs; ++i) {
+        uint32_t attr;
+        ss >> attr;
+        p_attrs.push_back(attr);
+      }
+
+      ss >> on_delete_int >> on_update_int;
 
       TableMetadata *c_meta = GetTable(child_table);
       TableMetadata *p_meta = GetTable(parent_table);
 
       if (c_meta && p_meta) {
-        std::vector<uint32_t> c_attrs = {child_col_idx};
-        std::vector<uint32_t> p_attrs = {parent_col_idx};
-
         ForeignKey fk(fk_name, c_attrs, p_meta->oid_, p_attrs,
                       static_cast<ReferentialAction>(on_delete_int),
                       static_cast<ReferentialAction>(on_update_int));
