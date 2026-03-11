@@ -67,7 +67,7 @@ bool SeqScanExecutor::Next(Tuple *tuple, RID *rid) {
 
     if (predicate != nullptr) {
       // Evaluate the expression tree against the tuple we just fetched
-      Value result = predicate->Evaluate(tuple, plan_->OutputSchema());
+      Value result = predicate->Evaluate(tuple, &metadata_->schema_);
 
       // If the WHERE clause evaluates to false, this row doesn't match.
       if (!result.GetAsBoolean()) {
