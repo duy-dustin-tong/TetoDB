@@ -490,42 +490,12 @@ const AbstractPlanNode *Planner::PlanUpdate(const UpdateStatement *stmt) {
       throw std::runtime_error("Planner Error: Column '" + col_name +
                                "' not found.");
 
-    const auto *ast_const =
-        dynamic_cast<const ConstantExpr *>(set_clause.second.get());
-    if (!ast_const)
-      throw std::runtime_error(
-          "Planner Error: UPDATE SET only supports raw constants right now.");
-
-    TypeId expected_type = schema.GetColumn(col_idx).GetTypeId();
-    std::string raw_str = ast_const->value_;
-    Value val;
-
-    if (raw_str == "NULL") {
-      val = Value::GetNullValue(expected_type);
-    } else if (expected_type == TypeId::INTEGER)
-      val = Value(TypeId::INTEGER, std::stoi(raw_str));
-    else if (expected_type == TypeId::BIGINT)
-      val = Value(TypeId::BIGINT, static_cast<int64_t>(std::stoll(raw_str)));
-    else if (expected_type == TypeId::DECIMAL)
-      val = Value(TypeId::DECIMAL, std::stod(raw_str));
-    else if (expected_type == TypeId::BOOLEAN) {
-      bool b = (raw_str == "TRUE" || raw_str == "true" || raw_str == "1");
-      val = Value(TypeId::BOOLEAN, b);
-    } else if (expected_type == TypeId::TIMESTAMP)
-      val = Value(TypeId::BIGINT, static_cast<int64_t>(std::stoll(raw_str)));
-    else if (expected_type == TypeId::VARCHAR) {
-      if (raw_str.length() >= 2 && raw_str.front() == '\'' &&
-          raw_str.back() == '\'') {
-        raw_str = raw_str.substr(1, raw_str.length() - 2);
-      }
-      val = Value(TypeId::VARCHAR, raw_str);
-    } else {
-      val = Value(TypeId::VARCHAR, raw_str);
-    }
-
-    auto const_val_expr = std::make_unique<ConstantValueExpression>(val);
-    update_exprs[col_idx] = const_val_expr.get();
-    expressions_.push_back(std::move(const_val_expr));
+    // --- M5 FIX: Evaluate arbitrary expressions instead of just Constants ---
+    auto update_val_expr = PlanExpression(set_clause.second.get(), &schema);
+    const AbstractExpression *val_expr_ptr = update_val_expr.get();
+    
+    update_exprs[col_idx] = val_expr_ptr;
+    expressions_.push_back(std::move(update_val_expr));
   }
 
   auto update_plan = std::make_unique<UpdatePlanNode>(
