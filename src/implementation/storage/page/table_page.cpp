@@ -209,14 +209,22 @@ bool TablePage::UpdateTuple(const Tuple &new_tuple, Tuple *old_tuple,
   // since the offset changes, those byte areas become unreachable dead space.
 
   if (GetFreeSpaceRemaining() < new_size) {
-    // Temporarily erase the old slot size so compaction claims its space
+    // Save the old tuple data before compaction invalidates its location
+    std::vector<char> saved_old_data(GetData() + tuple_offset,
+                                     GetData() + tuple_offset + tuple_size);
+
+    // Temporarily erase the old slot so compaction reclaims its space
     SetSlot(slot_idx, 0, 0);
     Compact();
 
-    // Check if compaction freed enough
+    // Check if compaction freed enough for the NEW tuple
     if (GetFreeSpaceRemaining() < new_size) {
-      // Restore the slot pointer if we failed to find space
-      SetSlot(slot_idx, tuple_offset, tuple_size);
+      // Not enough space even after compaction.
+      // Re-insert the old tuple at the current free pointer (post-compaction).
+      uint32_t restored_ptr = GetFreeSpacePointer() - tuple_size;
+      memcpy(GetData() + restored_ptr, saved_old_data.data(), tuple_size);
+      SetSlot(slot_idx, restored_ptr, tuple_size);
+      SetFreeSpacePointer(restored_ptr);
       return false;
     }
   }

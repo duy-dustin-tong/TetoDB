@@ -94,6 +94,9 @@ target_link_libraries(test_bug20_arithmetic tetodb_lib)
 add_executable(test_bug7 "src/test_bug7_compaction.cpp")
 target_link_libraries(test_bug7 tetodb_lib)
 
+add_executable(test_c1_stale_offset "src/test_c1_stale_offset.cpp")
+target_link_libraries(test_c1_stale_offset tetodb_lib)
+
 # 5. Link the Core Library to the Server
 target_link_libraries(teto_main tetodb_lib)
 
