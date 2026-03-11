@@ -177,6 +177,8 @@ int main() {
               << std::endl;
     std::cout << "\n=== ALL Bug 20 Tests PASSED ===" << std::endl;
     std::cout.flush();
-    _exit(0);
+    
+    txn_mgr->Commit(txn);
+    return 0;
   }
 }
