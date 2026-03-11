@@ -50,7 +50,18 @@ public:
     return PerformComputation(lhs, rhs);
   }
 
-  TypeId GetReturnType() const override { return TypeId::DECIMAL; }
+  TypeId GetReturnType() const override { 
+    TypeId lhs_type = GetChildAt(0)->GetReturnType();
+    TypeId rhs_type = GetChildAt(1)->GetReturnType();
+
+    if (lhs_type == TypeId::DECIMAL || rhs_type == TypeId::DECIMAL) {
+      return TypeId::DECIMAL;
+    }
+    if (lhs_type == TypeId::BIGINT || rhs_type == TypeId::BIGINT) {
+      return TypeId::BIGINT;
+    }
+    return TypeId::INTEGER;
+  }
 
 private:
   Value PerformComputation(const Value &lhs, const Value &rhs) const {
