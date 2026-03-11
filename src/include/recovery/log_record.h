@@ -10,9 +10,6 @@
 
 namespace tetodb {
 
-// Unique ID for every log record ever created
-using lsn_t = int32_t;
-
 /**
  * The types of actions we need to record to ensure durability.
  */
