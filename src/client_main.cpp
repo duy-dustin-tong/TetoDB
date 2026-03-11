@@ -1,6 +1,5 @@
 // client_main.cpp
 
-// client_main.cpp
 #include <iostream>
 #include <string>
 #include <vector>
