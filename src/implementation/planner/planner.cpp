@@ -283,10 +283,15 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
               agg_ast->func_name_);
 
         AggregationType atype = it->second;
-        TypeId return_type = (atype == AggregationType::AVERAGE ||
-                              atype == AggregationType::MEDIAN)
-                                 ? TypeId::DECIMAL
-                                 : TypeId::INTEGER;
+        TypeId return_type;
+        if (atype == AggregationType::AVERAGE || atype == AggregationType::MEDIAN) {
+          return_type = TypeId::DECIMAL;
+        } else if (atype == AggregationType::COUNT_STAR) {
+          return_type = TypeId::INTEGER;
+        } else {
+          // SUM, MIN, MAX should inherit the type of the argument
+          return_type = arg_expr->GetReturnType();
+        }
 
         aggregates.push_back(arg_expr.get());
         expressions_.push_back(std::move(arg_expr));
