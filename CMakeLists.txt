@@ -100,6 +100,9 @@ target_link_libraries(test_c1_stale_offset tetodb_lib)
 add_executable(test_c2_newpage_wal "src/test_c2_newpage_wal.cpp")
 target_link_libraries(test_c2_newpage_wal tetodb_lib)
 
+add_executable(test_h1_multi_column_fk "src/test_h1_multi_column_fk.cpp")
+target_link_libraries(test_h1_multi_column_fk tetodb_lib)
+
 # 5. Link the Core Library to the Server
 target_link_libraries(teto_main tetodb_lib)
 

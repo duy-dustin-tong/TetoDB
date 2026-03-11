@@ -111,12 +111,21 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
     // 2. CHILD-SIDE FOREIGN KEY VALIDATION
     // ==========================================
     for (const auto &fk : table_info_->foreign_keys_) {
-      Value new_child_val = new_tuple.GetValue(schema, fk.child_key_attrs_[0]);
-      Value old_child_val =
-          current_old_tuple.GetValue(schema, fk.child_key_attrs_[0]);
+      std::vector<Value> new_child_vals;
+      std::vector<Value> old_child_vals;
+      bool changed = false;
+      for (uint32_t c_attr : fk.child_key_attrs_) {
+        Value n_val = new_tuple.GetValue(schema, c_attr);
+        Value o_val = current_old_tuple.GetValue(schema, c_attr);
+        new_child_vals.push_back(n_val);
+        old_child_vals.push_back(o_val);
+        if (!n_val.CompareEquals(o_val)) {
+          changed = true;
+        }
+      }
 
-      if (new_child_val.CompareEquals(old_child_val))
-        continue; // Unchanged FK column, skip lookup
+      if (!changed)
+        continue; // Unchanged FK columns, skip lookup
 
       TableMetadata *parent_meta = catalog->GetTable(fk.parent_table_oid_);
       if (!parent_meta) {
@@ -134,10 +143,12 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
       }
 
       if (pk_index) {
-        std::vector<Column> p_key_cols = {
-            parent_meta->schema_.GetColumn(fk.parent_key_attrs_[0])};
+        std::vector<Column> p_key_cols;
+        for (uint32_t p_attr : fk.parent_key_attrs_) {
+          p_key_cols.push_back(parent_meta->schema_.GetColumn(p_attr));
+        }
         Schema p_key_schema(p_key_cols);
-        Tuple search_key(std::vector<Value>{new_child_val}, &p_key_schema);
+        Tuple search_key(new_child_vals, &p_key_schema);
         std::vector<RID> p_rids;
         pk_index->index_->ScanKey(search_key, &p_rids, txn);
         if (!p_rids.empty()) {
@@ -152,9 +163,16 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
         while (p_iter != parent_meta->table_->End()) {
           Tuple p_tuple;
           if (parent_meta->table_->GetTuple(p_iter.GetRid(), &p_tuple, txn)) {
-            Value p_val = p_tuple.GetValue(&parent_meta->schema_,
-                                           fk.parent_key_attrs_[0]);
-            if (p_val.CompareEquals(new_child_val)) {
+            bool match = true;
+            for (size_t i = 0; i < fk.parent_key_attrs_.size(); i++) {
+              Value p_val = p_tuple.GetValue(&parent_meta->schema_,
+                                             fk.parent_key_attrs_[i]);
+              if (!p_val.CompareEquals(new_child_vals[i])) {
+                match = false;
+                break;
+              }
+            }
+            if (match) {
               found_parent = true;
               if (!lock_mgr->LockShared(txn, p_iter.GetRid())) {
                 throw std::runtime_error(

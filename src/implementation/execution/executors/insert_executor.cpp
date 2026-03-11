@@ -76,7 +76,11 @@ bool InsertExecutor::Next(Tuple *tuple, RID *rid) {
   LockManager *lock_mgr = exec_ctx_->GetLockManager();
 
   for (const auto &fk : table_info_->foreign_keys_) {
-    Value child_val = to_insert.GetValue(schema, fk.child_key_attrs_[0]);
+    std::vector<Value> child_vals;
+    for (uint32_t c_attr : fk.child_key_attrs_) {
+      child_vals.push_back(to_insert.GetValue(schema, c_attr));
+    }
+
     TableMetadata *parent_meta = catalog->GetTable(fk.parent_table_oid_);
     if (!parent_meta)
       throw std::runtime_error(
@@ -94,10 +98,12 @@ bool InsertExecutor::Next(Tuple *tuple, RID *rid) {
     }
 
     if (pk_index) {
-      std::vector<Column> p_key_cols = {
-          parent_meta->schema_.GetColumn(fk.parent_key_attrs_[0])};
+      std::vector<Column> p_key_cols;
+      for (uint32_t p_attr : fk.parent_key_attrs_) {
+        p_key_cols.push_back(parent_meta->schema_.GetColumn(p_attr));
+      }
       Schema p_key_schema(p_key_cols);
-      Tuple search_key(std::vector<Value>{child_val}, &p_key_schema);
+      Tuple search_key(child_vals, &p_key_schema);
       std::vector<RID> p_rids;
       pk_index->index_->ScanKey(search_key, &p_rids, txn);
       if (!p_rids.empty()) {
@@ -112,9 +118,16 @@ bool InsertExecutor::Next(Tuple *tuple, RID *rid) {
       while (p_iter != parent_meta->table_->End()) {
         Tuple p_tuple;
         if (parent_meta->table_->GetTuple(p_iter.GetRid(), &p_tuple, txn)) {
-          Value p_val =
-              p_tuple.GetValue(&parent_meta->schema_, fk.parent_key_attrs_[0]);
-          if (p_val.CompareEquals(child_val)) {
+          bool match = true;
+          for (size_t i = 0; i < fk.parent_key_attrs_.size(); i++) {
+            Value p_val =
+                p_tuple.GetValue(&parent_meta->schema_, fk.parent_key_attrs_[i]);
+            if (!p_val.CompareEquals(child_vals[i])) {
+              match = false;
+              break;
+            }
+          }
+          if (match) {
             found_parent = true;
             if (!lock_mgr->LockShared(txn, p_iter.GetRid())) {
               throw std::runtime_error("Transaction Aborted: Failed to acquire "
