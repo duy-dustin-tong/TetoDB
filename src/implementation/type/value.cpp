@@ -1,7 +1,6 @@
 // value.cpp
 
 #include "type/value.h"
-#include <regex>
 #include <stdexcept>
 
 namespace tetodb {
