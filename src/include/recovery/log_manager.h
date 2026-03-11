@@ -31,8 +31,8 @@ private:
   std::atomic<lsn_t> next_lsn_{0};
   std::atomic<lsn_t> persistent_lsn_{INVALID_LSN};
 
-  char *log_buffer_;
-  char *flush_buffer_;
+  std::unique_ptr<char[]> log_buffer_;
+  std::unique_ptr<char[]> flush_buffer_;
   uint32_t log_buffer_offset_{0};
   uint32_t flush_buffer_offset_{0};
 
@@ -43,7 +43,7 @@ private:
   std::condition_variable
       flush_cv_; // FIX: Blocks committing threads until disk I/O finishes
 
-  std::thread *flush_thread_{nullptr};
+  std::thread flush_thread_;
   std::atomic<bool> enable_logging_{false};
 };
 

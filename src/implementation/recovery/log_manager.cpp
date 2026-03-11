@@ -8,14 +8,12 @@ namespace tetodb {
 
     LogManager::LogManager(DiskManager* disk_manager)
         : disk_manager_(disk_manager) {
-        log_buffer_ = new char[LOG_BUFFER_SIZE];
-        flush_buffer_ = new char[LOG_BUFFER_SIZE];
+        log_buffer_ = std::make_unique<char[]>(LOG_BUFFER_SIZE);
+        flush_buffer_ = std::make_unique<char[]>(LOG_BUFFER_SIZE);
     }
 
     LogManager::~LogManager() {
         StopFlushThread();
-        delete[] log_buffer_;
-        delete[] flush_buffer_;
     }
 
     lsn_t LogManager::AppendLogRecord(LogRecord* log_record) {
@@ -37,7 +35,7 @@ namespace tetodb {
             append_cv_.wait(lock);
         }
 
-        uint32_t bytes_written = log_record->Serialize(log_buffer_ + log_buffer_offset_);
+        uint32_t bytes_written = log_record->Serialize(log_buffer_.get() + log_buffer_offset_);
         assert(bytes_written == size);
 
         log_buffer_offset_ += bytes_written;
@@ -64,7 +62,7 @@ namespace tetodb {
         if (enable_logging_) return;
         enable_logging_ = true;
 
-        flush_thread_ = new std::thread([&]() {
+        flush_thread_ = std::thread([&]() {
             while (enable_logging_) {
                 std::unique_lock<std::mutex> lock(latch_);
 
@@ -85,7 +83,7 @@ namespace tetodb {
                     // 3. WRITE TO DISK (Drop the lock so executors can append to the new active buffer!)
                     lock.unlock();
 
-                    disk_manager_->WriteLog(flush_buffer_, flush_buffer_offset_);
+                    disk_manager_->WriteLog(flush_buffer_.get(), flush_buffer_offset_);
 
                     lock.lock();
                     flush_buffer_offset_ = 0;
@@ -94,7 +92,7 @@ namespace tetodb {
                     flush_cv_.notify_all();
                 }
             }
-            });
+        });
     }
 
     void LogManager::StopFlushThread() {
@@ -105,10 +103,8 @@ namespace tetodb {
         enable_logging_ = false;
         cv_.notify_all(); // Wake the thread to exit the loop
 
-        if (flush_thread_ != nullptr && flush_thread_->joinable()) {
-            flush_thread_->join();
-            delete flush_thread_;
-            flush_thread_ = nullptr;
+        if (flush_thread_.joinable()) {
+            flush_thread_.join();
         }
     }
 
