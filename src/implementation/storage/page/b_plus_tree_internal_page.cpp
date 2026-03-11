@@ -15,6 +15,11 @@ INDEX_TEMPLATE_ARGUMENTS
 ValueType
 B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key,
                                        const KeyComparator &comparator) const {
+  // M9 FIX: Prevent uint32_t underflow if size is 0 or 1
+  if (GetSize() <= 1) {
+    return array_[0].second;
+  }
+
   // Range: [1, size) because index 0 is invalid key
   uint32_t left = 1;
   uint32_t right = GetSize() - 1;
