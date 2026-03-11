@@ -438,19 +438,39 @@ void TcpServer::HandleClient(SOCKET client_socket) {
       std::transform(upper_sql.begin(), upper_sql.end(), upper_sql.begin(),
                      ::toupper);
 
-      // --- THE FIX: Tell libpq if tuples are actually coming ---
+      // --- THE FIX: Tell libpq if tuples are actually coming by testing the Query ---
       if (upper_sql.find("SELECT") != std::string::npos ||
-          upper_sql.find("SHOW") != std::string::npos) {
-        std::vector<char> row_desc;
-        WriteInt16(row_desc, 1);
-        WriteString(row_desc, "tetodb_output");
-        WriteInt32(row_desc, 0);
-        WriteInt16(row_desc, 0);
-        WriteInt32(row_desc, 25);
-        WriteInt16(row_desc, -1);
-        WriteInt32(row_desc, -1);
-        WriteInt16(row_desc, 0);
-        SendPacket(client_socket, 'T', row_desc);
+          upper_sql.find("SHOW") != std::string::npos ||
+          upper_sql.find("EXPLAIN") != std::string::npos) {
+        
+        // Execute the query to get the schema (but we might need to rollback or use a dry run. For now ExecuteQuery handles read-only SELECTs safely)
+        QueryResult res = db_->ExecuteQuery(sql, session);
+        
+        if (res.schema) {
+          std::vector<char> row_desc;
+          WriteInt16(row_desc, res.schema->GetColumnCount());
+          for (uint32_t i = 0; i < res.schema->GetColumnCount(); i++) {
+            const auto &col = res.schema->GetColumn(i);
+            WriteString(row_desc, col.GetName());
+            WriteInt32(row_desc, 0); // Table OID (Not strictly needed for basic drivers)
+            WriteInt16(row_desc, 0); // Column Index
+            
+            int32_t pg_type = 25; // TEXT
+            if (col.GetTypeId() == TypeId::INTEGER) {
+              pg_type = 23; // INT4
+            } else if (col.GetTypeId() == TypeId::BIGINT) {
+              pg_type = 20; // INT8
+            }
+            
+            WriteInt32(row_desc, pg_type);
+            WriteInt16(row_desc, -1); // Type size (-1 = varlena)
+            WriteInt32(row_desc, -1); // Typemod
+            WriteInt16(row_desc, 0);  // Format code (0 = text)
+          }
+          SendPacket(client_socket, 'T', row_desc);
+        } else {
+          SendPacket(client_socket, 'n', {});
+        }
       } else {
         SendPacket(client_socket, 'n', {}); // NoData packet
       }
