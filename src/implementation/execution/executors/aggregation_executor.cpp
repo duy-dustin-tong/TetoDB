@@ -33,6 +33,30 @@ namespace tetodb {
             InsertCombine(agg_key, agg_val);
         }
 
+        // --- NEW: Handle empty table for global aggregations ---
+        // If the table is empty AND there is no GROUP BY clause,
+        // SQL standard requires returning exactly ONE row with default values.
+        if (ht_.empty() && plan_->GetGroupBys().empty()) {
+            AggregateKey empty_key;
+            AggregateValue initial_val;
+            const auto& agg_types = plan_->GetAggregateTypes();
+            
+            initial_val.aggregates_.resize(agg_types.size());
+            initial_val.counts_.resize(agg_types.size(), 0);
+            initial_val.history_.resize(agg_types.size());
+            
+            for (size_t i = 0; i < agg_types.size(); i++) {
+                if (agg_types[i] == AggregationType::COUNT_STAR) {
+                    initial_val.aggregates_[i] = Value(TypeId::INTEGER, 0); // COUNT(*) on empty table = 0
+                } else if (agg_types[i] == AggregationType::SUM) {
+                    initial_val.aggregates_[i] = Value::GetNullValue(TypeId::INTEGER); // SUM on empty table = NULL
+                } else {
+                    initial_val.aggregates_[i] = Value::GetNullValue(TypeId::VARCHAR); // MIN/MAX/AVG on empty table = NULL
+                }
+            }
+            ht_[empty_key] = initial_val;
+        }
+
         ht_iterator_ = ht_.begin();
     }
 
