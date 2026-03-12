@@ -91,6 +91,9 @@ target_link_libraries(test_bug19_fk_cascade tetodb_lib)
 add_executable(test_bug20_arithmetic src/test_bug20_arithmetic.cpp)
 target_link_libraries(test_bug20_arithmetic tetodb_lib)
 
+add_executable(test_bug21_count_star src/test_bug21_count_star.cpp)
+target_link_libraries(test_bug21_count_star tetodb_lib)
+
 add_executable(test_bug7 "src/test_bug7_compaction.cpp")
 target_link_libraries(test_bug7 tetodb_lib)
 
@@ -117,3 +120,26 @@ endif()
 
 add_executable(test_m10_drop_table_fk_cleanup src/test_m10_drop_table_fk_cleanup.cpp)
 target_link_libraries(test_m10_drop_table_fk_cleanup tetodb_lib)
+
+# ---------------------------------------------------------
+# Googletest Integration
+# ---------------------------------------------------------
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
+)
+# For Windows: Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(CMAKE_TLS_VERIFY 0)
+FetchContent_MakeAvailable(googletest)
+
+add_executable(tetodb_tests src/test_units.cpp)
+target_link_libraries(tetodb_tests tetodb_lib gtest_main)
+
+if(WIN32)
+    target_link_libraries(tetodb_tests ws2_32)
+endif()
+
+include(GoogleTest)
+gtest_discover_tests(tetodb_tests)
