@@ -104,7 +104,7 @@ namespace tetodb {
         if (!comp_expr) return plan;
 
         if (comp_expr->GetCompType() == CompType::EQUAL) {
-            std::cout << "[OPTIMIZER] Rule Triggered: Upgraded NestedLoopJoin to HashJoin!\n";
+
 
             auto hash_join = std::make_unique<HashJoinPlanNode>(
                 nlj_plan->OutputSchema(),
@@ -130,7 +130,7 @@ namespace tetodb {
         // Pattern 1: Direct Limit -> Sort
         if (child->GetPlanType() == PlanType::Sort) {
             const auto* sort_plan = static_cast<const SortPlanNode*>(child);
-            std::cout << "[OPTIMIZER] Rule Triggered: Upgraded Sort + Limit to TopN!\n";
+
 
             auto topn_plan = std::make_unique<TopNPlanNode>(
                 limit_plan->OutputSchema(), sort_plan->GetChildPlan(),
@@ -148,7 +148,7 @@ namespace tetodb {
             if (proj_plan->GetChildPlan()->GetPlanType() == PlanType::Sort) {
                 const auto* sort_plan = static_cast<const SortPlanNode*>(proj_plan->GetChildPlan());
 
-                std::cout << "[OPTIMIZER] Rule Triggered: Upgraded Sort + Limit to TopN (Pushed through Projection)!\n";
+
 
                 // 1. Create TopN to replace the Sort
                 auto topn_plan = std::make_unique<TopNPlanNode>(
@@ -193,7 +193,7 @@ namespace tetodb {
         for (auto* index_info : table_indexes) {
             if (index_info->key_attrs_.size() == 1 && index_info->key_attrs_[0] == col_expr->GetColIdx()) {
 
-                std::cout << "[OPTIMIZER] Rule Triggered: Upgraded SeqScan to IndexScan on '" << index_info->name_ << "'!\n";
+
 
                 // Extract constant value to query the B+ Tree
                 Value search_val = const_expr->Evaluate(nullptr, nullptr);
