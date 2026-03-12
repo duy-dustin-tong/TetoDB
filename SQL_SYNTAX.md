@@ -59,6 +59,36 @@ DROP VIEW view_name;
 
 ---
 
+## Supported Data Types
+
+| SQL Type | Internal Type | Size | Notes |
+|----------|--------------|------|-------|
+| `INT` / `INTEGER` | INTEGER | 4 bytes | 32-bit signed integer |
+| `BIGINT` | BIGINT | 8 bytes | 64-bit signed integer |
+| `SMALLINT` | SMALLINT | 2 bytes | 16-bit signed integer |
+| `TINYINT` | TINYINT | 1 byte | 8-bit signed integer |
+| `BOOLEAN` / `BOOL` | BOOLEAN | 1 byte | `TRUE` or `FALSE` |
+| `DECIMAL` / `FLOAT` / `DOUBLE` | DECIMAL | 8 bytes | 64-bit double precision |
+| `VARCHAR` / `TEXT` | VARCHAR | Variable | Length-prefixed string |
+| `CHAR` | CHAR | Variable | Length-prefixed string |
+| `DATE` / `TIMESTAMP` | TIMESTAMP | 8 bytes | UTC epoch seconds. Accepts `'YYYY-MM-DD'` or `'YYYY-MM-DD HH:MM:SS'` |
+
+### Timestamp/Date Literals
+```sql
+INSERT INTO events VALUES (1, 'Meeting', '2024-06-15');
+INSERT INTO logs VALUES (1, '2024-06-15 14:30:00');
+```
+String values are automatically coerced to TIMESTAMP when inserting/updating into TIMESTAMP columns.
+
+### Escaped Single Quotes
+Use `''` (two single quotes) to represent a literal single quote inside a string:
+```sql
+INSERT INTO users VALUES (1, 'O''Brien');
+SELECT * FROM users WHERE name = 'it''s';
+```
+
+---
+
 ## Data Manipulation Language (DML)
 
 ### 1. SELECT (Querying Data)
