@@ -165,7 +165,7 @@ TetoDB executes an internal recursive evaluation tree for scalar values.
 ### Built-In Functions
 Functions operate on rows synchronously:
 * **Aggregate Functions** (Used often with `GROUP BY`): 
-  * `COUNT()`, `SUM()`, `MIN()`, `MAX()`, `AVG()` / `AVERAGE()`, `MED()` / `MEDIAN()`
+  * `COUNT()`, `SUM()`, `MIN()`, `MAX()`, `AVG()`, `MEDIAN()`
 * **Scalar String Functions**:
   * `UPPER(str)`, `LOWER(str)`, `LENGTH(str)`, `CONCAT(str1, str2, ...)`, `SUBSTRING(str, ...)`
 
@@ -181,12 +181,25 @@ COMMIT;
 ROLLBACK;
 ```
 
-**Nested Savepoints:**
+**Transaction Boundaries:**
 ```sql
-SAVEPOINT name;
-ROLLBACK TO [SAVEPOINT] name;
-RELEASE [SAVEPOINT] name;
+BEGIN;
+COMMIT;
+ROLLBACK;
 ```
+
+---
+
+## Unsupported Features (SQLAlchemy Considerations)
+
+Because TetoDB is a lightweight engine, certain standard SQL features commonly used by ORMs like SQLAlchemy are **explicitly not supported**. Attempting to use them will result in a `std::runtime_error`.
+
+1. **No Nested Transactions / Savepoints:** `SAVEPOINT`, `RELEASE SAVEPOINT`, and `ROLLBACK TO SAVEPOINT` are not supported and will throw an error. SQLAlchemy's `session.begin_nested()` will not work.
+2. **No Prepared Statement Deallocation:** The `DEALLOCATE` command is not supported.
+3. **No ALTER TABLE:** Schema modifications after creation are not supported.
+4. **No Auto-Increment Sequences:** TetoDB does not automatically generate primary keys. You must insert PKs manually.
+5. **Positional INSERTs Only:** `INSERT INTO table (col) VALUES (val)` is not supported; you must use `INSERT INTO table VALUES (val1, val2, ...)`.
+6. **No Information Schema:** SQLAlchemy reflection (`metadata.reflect`) is limited.
 
 ---
 
@@ -199,10 +212,4 @@ Prefix any DML statement with `EXPLAIN` to halt physical execution and instead r
 EXPLAIN SELECT u.name, SUM(o.total) 
 FROM users u JOIN orders o ON u.id = o.user_id 
 GROUP BY u.name;
-```
-
-### Resource Deallocation
-```sql
-DEALLOCATE ALL;
-DEALLOCATE object_name;
 ```

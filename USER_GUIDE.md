@@ -235,26 +235,33 @@ tetodb://host:port/database
 
 ### Query Features (Current)
 - Supported core statements include `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `CREATE TABLE`, `DROP TABLE`, `CREATE INDEX`, and `DROP INDEX`.
-- Aggregates include `COUNT(*)`, `COUNT(expr)`, `SUM`, `MIN`, `MAX`, and `AVG`/`AVERAGE`.
-- `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`/`OFFSET`, `JOIN`, `IN`, `LIKE`/`ILIKE`, CTEs (`WITH`), and set operations (`UNION`, `INTERSECT`, `EXCEPT`) are available.
+- Aggregates include `COUNT(*)`, `COUNT(expr)`, `SUM`, `MIN`, `MAX`, `AVG`, and `MEDIAN`. (Empty table aggregates properly return 0 or NULL).
+- Built-in string matching via `LIKE`/`ILIKE` uses safe iterative backtracking (no stack overflow risk).
+- `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`/`OFFSET`, `JOIN`, `IN`, CTEs (`WITH`), and set operations (`UNION`, `INTERSECT`, `EXCEPT`) are available.
 - `EXPLAIN` is available for inspecting plans.
 
 ### Transactions
 - TetoDB supports `BEGIN`, `COMMIT`, and `ROLLBACK`.
 - Without an explicit `BEGIN`, each statement runs in **autocommit mode**.
 - If a statement fails inside a transaction, the transaction becomes **poisoned** — all subsequent statements are rejected until you `COMMIT` (which auto-rollbacks) or `ROLLBACK`.
-- `SAVEPOINT`, `RELEASE SAVEPOINT`, and `ROLLBACK TO SAVEPOINT` are parsed and acknowledged but are **no-ops** (no nested transaction support).
+- Nested transactions (`SAVEPOINT`, `RELEASE SAVEPOINT`, `ROLLBACK TO SAVEPOINT`) are **NOT supported** and explicitly throw errors. Provide this information to SQLAlchemy (e.g., do not use `session.begin_nested()`).
 
 ### Concurrency
 - TetoDB uses **Strict Two-Phase Locking (2PL)** for transaction isolation.
 - Multiple clients can connect simultaneously, but heavy write contention on the same rows may cause lock waits or aborts.
 - Background checkpointing runs every 5 seconds.
 
-### SQLAlchemy Limitations
+### SQLAlchemy Limitations (READ THIS)
+Because TetoDB is a core engine without full PostgreSQL feature bloat, you must configure SQLAlchemy appropriately:
+
+- **No Nested Transactions**: Do not use `session.begin_nested()`. Savepoints throw missing feature errors.
+- **Positional INSERTS Only**: TetoDB requires `INSERT INTO table VALUES (...)` rather than column targeting.
 - **Reflection is limited**: `get_table_names()` returns an empty list since TetoDB doesn't have `information_schema`. The `has_table()` method works by probing with `SELECT ... LIMIT 0`.
 - **No ALTER TABLE**: Schema modifications after creation are not supported.
-- **No auto-increment**: Primary keys must be provided explicitly.
-- **Parameter style**: The driver uses client-side `?` parameter substitution. Values are escaped, but avoid user-controlled input in raw SQL where possible.
+- **No auto-increment**: Primary keys must be provided explicitly. TetoDB has no sequences.
+- **No DEALLOCATE**: Connection pooling tools trying to deallocate prepared statements will receive an error.
+- **Parameter style**: The driver uses client-side `?` parameter substitution. Values are safely escaped (including single quotes).
+- **Data Types**: `TIMESTAMP` accepts strings formatted as `'YYYY-MM-DD'` or `'YYYY-MM-DD HH:MM:SS'` and uses 64-bit UTC epoch storage internally.
 
 ### Web App Compatibility Notes (FastAPI + SQLAlchemy)
 - For startup migrations/seeding in demo apps, prefer small idempotent SQL statements and explicit error handling; if a statement fails in a transaction, issue `ROLLBACK` before continuing.

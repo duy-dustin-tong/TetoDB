@@ -1,3 +1,27 @@
+# ==============================================================================
+# TetoDB: Lightweight Relational Database Engine
+# 
+# KEY FEATURES & RECENT FIXES:
+# - Full SQL Pipeline (Lexer -> Parser -> Planner -> Optimizer -> Executor)
+# - B+ Tree Indexing & Explicit Foreign Key Constraint Validation
+# - Strict 2PL Concurrency Control (Thread-safe, mutex-safe, no lock ordering bugs)
+# - Write-Ahead Logging (WAL) with ARIES Recovery
+# - Column Metadata Persists: NOT NULL, UNIQUE, PRIMARY KEY status survives restarts.
+# - Data Types: INTEGER, BIGINT, SMALLINT, TINYINT, BOOLEAN, DECIMAL, VARCHAR, CHAR, TIMESTAMP
+# - Supported Statements: SELECT, INSERT, UPDATE, DELETE, CREATE/DROP TABLE/INDEX
+# - Aggregations: COUNT, SUM, MIN, MAX, AVG, MEDIAN (Empty tables properly return 0/NULL)
+# - Robust LIKE/ILIKE string matching (Iterative backtracking, stack-overflow safe)
+# - Escaped Single Quotes Supported ('O''Brien')
+# 
+# SQLALCHEMY / ORM LIMITATIONS (Must Read!):
+# - No Nested Transactions: SAVEPOINT, RELEASE, ROLLBACK TO throw explicit unsupported errors.
+# - No DEALLOCATE support for prepared statements (throws error).
+# - Positional INSERTS Only: `INSERT INTO table VALUES (...)` (No column targeting).
+# - No Auto-Increment: Primary keys must be explicitly provided in inserts.
+# - No ALTER TABLE schema modifications.
+# - No Information Schema: Reflection is limited.
+# ==============================================================================
+
 # ========================
 # Build Artifacts
 # ========================
