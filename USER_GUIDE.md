@@ -6,13 +6,25 @@ TetoDB is a lightweight relational database engine built from scratch in C++. It
 
 ## Building TetoDB
 
+TetoDB can be compiled on both Windows and Linux/macOS.
+
+**Windows (PowerShell):**
 ```powershell
 cd TetoDB
 cmake -S . -B build
 cmake --build build --config Release
 ```
 
-This produces two executables in `build/Release/`:
+**Linux / macOS (Bash):**
+```bash
+cd TetoDB
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j4
+```
+
+This produces two executables in `build/Release/` (or `build/` on Linux):
 - **`teto_main.exe`** — the database server
 - **`teto_client.exe`** — the interactive REPL client
 

@@ -16,9 +16,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
 #define CLOSE_SOCKET close
-#define SOCKET_ERROR -1
 #endif
 
 namespace tetodb {
