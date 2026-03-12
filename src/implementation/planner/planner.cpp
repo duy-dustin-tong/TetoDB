@@ -263,8 +263,6 @@ const AbstractPlanNode *Planner::PlanSelect(const SelectStatement *stmt) {
         {"MIN", AggregationType::MIN},
         {"MAX", AggregationType::MAX},
         {"AVG", AggregationType::AVERAGE},
-        {"AVERAGE", AggregationType::AVERAGE},
-        {"MED", AggregationType::MEDIAN},
         {"MEDIAN", AggregationType::MEDIAN}};
 
     for (const auto &expr_ast : stmt->select_list_) {

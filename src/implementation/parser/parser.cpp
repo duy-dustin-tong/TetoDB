@@ -737,6 +737,8 @@ std::unique_ptr<Expr> Parser::ParseBaseExpression() {
       (upper_val == "COUNT" || upper_val == "SUM" || upper_val == "MIN" ||
        upper_val == "MAX" || upper_val == "AVG" || upper_val == "AVERAGE" ||
        upper_val == "MED" || upper_val == "MEDIAN")) {
+    if (upper_val == "AVERAGE") upper_val = "AVG";
+    if (upper_val == "MED") upper_val = "MEDIAN";
 
     Advance();
 
