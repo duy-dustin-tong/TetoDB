@@ -138,71 +138,7 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
       if (!changed)
         continue; // Unchanged FK columns, skip lookup
 
-      TableMetadata *parent_meta = catalog->GetTable(fk.parent_table_oid_);
-      if (!parent_meta) {
-        throw std::runtime_error("Foreign Key Error: Parent table lost.");
-      }
-
-      bool found_parent = false;
-      auto parent_indexes = catalog->GetTableIndexes(parent_meta->oid_);
-      IndexMetadata *pk_index = nullptr;
-      for (auto *idx : parent_indexes) {
-        if (idx->key_attrs_ == fk.parent_key_attrs_) {
-          pk_index = idx;
-          break;
-        }
-      }
-
-      if (pk_index) {
-        std::vector<Column> p_key_cols;
-        for (uint32_t p_attr : fk.parent_key_attrs_) {
-          p_key_cols.push_back(parent_meta->schema_.GetColumn(p_attr));
-        }
-        Schema p_key_schema(p_key_cols);
-        Tuple search_key(new_child_vals, &p_key_schema);
-        std::vector<RID> p_rids;
-        pk_index->index_->ScanKey(search_key, &p_rids, txn);
-        if (!p_rids.empty()) {
-          found_parent = true;
-          if (!lock_mgr->LockShared(txn, p_rids[0])) {
-            throw std::runtime_error("Transaction Aborted: Failed to acquire "
-                                     "Shared Lock on Parent Tuple.");
-          }
-        }
-      } else {
-        auto p_iter = parent_meta->table_->Begin(txn);
-        while (p_iter != parent_meta->table_->End()) {
-          Tuple p_tuple;
-          if (parent_meta->table_->GetTuple(p_iter.GetRid(), &p_tuple, txn)) {
-            bool match = true;
-            for (size_t i = 0; i < fk.parent_key_attrs_.size(); i++) {
-              Value p_val = p_tuple.GetValue(&parent_meta->schema_,
-                                             fk.parent_key_attrs_[i]);
-              if (!p_val.CompareEquals(new_child_vals[i])) {
-                match = false;
-                break;
-              }
-            }
-            if (match) {
-              found_parent = true;
-              if (!lock_mgr->LockShared(txn, p_iter.GetRid())) {
-                throw std::runtime_error(
-                    "Transaction Aborted: Failed to acquire Shared Lock on "
-                    "Parent Tuple.");
-              }
-              break;
-            }
-          }
-          ++p_iter;
-        }
-      }
-
-      if (!found_parent) {
-        throw std::runtime_error(
-            "Constraint Violation: Foreign key '" + fk.fk_name_ +
-            "' referenced value does not exist in parent table '" +
-            parent_meta->name_ + "'.");
-      }
+      FKConstraintHandler::ValidateForeignKey(fk, new_child_vals, catalog, txn, lock_mgr);
     }
 
     // ==========================================

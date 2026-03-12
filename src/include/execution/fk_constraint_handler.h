@@ -32,6 +32,13 @@ public:
                               Transaction *txn,
                               const WriteLockFn &acquire_write_lock,
                               LockManager *lock_mgr = nullptr);
+
+  // Validates that a foreign key reference exists in the parent table.
+  // Used by INSERT and UPDATE executors. Throws if missing.
+  static void ValidateForeignKey(const ForeignKey &fk,
+                                 const std::vector<Value> &child_vals,
+                                 Catalog *catalog, Transaction *txn,
+                                 LockManager *lock_mgr = nullptr);
 };
 
 } // namespace tetodb
