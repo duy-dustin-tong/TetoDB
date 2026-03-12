@@ -3,7 +3,7 @@ import psycopg2
 print("Connecting to TetoDB...")
 try:
     # 1. THE HANDSHAKE
-    # This triggers the Startup, Auth, and the dummy SET/SHOW bypasses in your parser.
+    # This triggers the Startup and Auth handshake with TetoDB.
     conn = psycopg2.connect(host="127.0.0.1", port=5432, user="postgres")
     cur = conn.cursor()
     print("[SUCCESS] Handshake Bypassed. TetoDB accepted the connection.")
