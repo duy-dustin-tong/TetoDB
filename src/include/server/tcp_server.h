@@ -2,10 +2,13 @@
 
 #pragma once
 
+#include <atomic>
+#include <list>
+#include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
-#include <atomic>
 #include "server/tetodb_instance.h"
 
 #ifdef _WIN32
@@ -33,6 +36,9 @@ namespace tetodb {
         void AcceptLoop();
         void HandleClient(SOCKET client_socket);
 
+        // Reap threads that have finished
+        void ReapFinishedThreads();
+
         // TetoWire Byte Formatting Helpers
         void WriteInt32(std::vector<char>& buf, int32_t val);
         void WriteInt16(std::vector<char>& buf, int16_t val);
@@ -44,7 +50,12 @@ namespace tetodb {
         int port_;
         SOCKET server_fd_;
         std::atomic<bool> is_running_;
-        std::vector<std::thread> client_threads_;
+
+        // Thread-safe client thread management
+        std::mutex threads_latch_;
+        std::list<std::thread> client_threads_;
+        std::set<std::thread::id> finished_threads_;
+
         std::thread accept_thread_;
     };
 

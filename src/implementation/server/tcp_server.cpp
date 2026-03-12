@@ -84,23 +84,47 @@ void TcpServer::Stop() {
   }
   if (accept_thread_.joinable())
     accept_thread_.join();
+
+  // Join ALL remaining client threads
+  std::lock_guard<std::mutex> lock(threads_latch_);
   for (auto &t : client_threads_) {
     if (t.joinable())
       t.join();
   }
+  client_threads_.clear();
+  finished_threads_.clear();
+
 #ifdef _WIN32
   WSACleanup();
 #endif
+}
+
+void TcpServer::ReapFinishedThreads() {
+  std::lock_guard<std::mutex> lock(threads_latch_);
+  for (auto it = client_threads_.begin(); it != client_threads_.end(); ) {
+    if (finished_threads_.count(it->get_id())) {
+      it->join();
+      finished_threads_.erase(it->get_id());
+      it = client_threads_.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 void TcpServer::AcceptLoop() {
   struct sockaddr_in client_addr;
   socklen_t client_len = sizeof(client_addr);
   while (is_running_) {
+    // Periodically clean up finished client threads
+    ReapFinishedThreads();
+
     SOCKET client_socket =
         accept(server_fd_, (struct sockaddr *)&client_addr, &client_len);
     if (client_socket == INVALID_SOCKET)
       continue;
+
+    std::lock_guard<std::mutex> lock(threads_latch_);
     client_threads_.emplace_back(&TcpServer::HandleClient, this, client_socket);
   }
 }
@@ -303,6 +327,12 @@ void TcpServer::HandleClient(SOCKET client_socket) {
     }
   }
   CLOSE_SOCKET(client_socket);
+
+  // Signal that this thread is done so ReapFinishedThreads() can join & remove it
+  {
+    std::lock_guard<std::mutex> lock(threads_latch_);
+    finished_threads_.insert(std::this_thread::get_id());
+  }
 }
 
 } // namespace tetodb
