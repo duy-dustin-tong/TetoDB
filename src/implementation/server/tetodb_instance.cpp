@@ -124,37 +124,14 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
       return res;
     }
 
-    if (ast->type_ == ASTNodeType::SET_STATEMENT) {
-      res.status_msg = "SET";
-      return res;
-    }
-    if (ast->type_ == ASTNodeType::SHOW_STATEMENT) {
-      res.status_msg = "SHOW";
-      return res;
-    }
-
-    // Savepoints: acknowledged as no-ops (no nested transaction support yet)
+    // Savepoints: throw unsupported error instead of silently returning success
     if (ast->type_ == ASTNodeType::SAVEPOINT_STATEMENT) {
-      auto *sp_stmt = static_cast<SavepointStatement *>(ast.get());
-      switch (sp_stmt->cmd_) {
-      case SavepointCmd::SAVEPOINT:
-        res.status_msg = "SAVEPOINT";
-        break;
-      case SavepointCmd::RELEASE:
-        res.status_msg = "RELEASE SAVEPOINT";
-        break;
-      case SavepointCmd::ROLLBACK_TO:
-        res.status_msg = "ROLLBACK";
-        break;
-      }
-      return res;
+      throw std::runtime_error("Savepoints are not supported");
     }
 
-    // Deallocate: acknowledged as no-op (prepared statements live in
-    // ClientSession)
+    // Deallocate: throw unsupported error instead of silently returning success
     if (ast->type_ == ASTNodeType::DEALLOCATE_STATEMENT) {
-      res.status_msg = "DEALLOCATE";
-      return res;
+      throw std::runtime_error("DEALLOCATE is not supported");
     }
 
     if (session.is_poisoned)
