@@ -143,3 +143,22 @@ endif()
 
 include(GoogleTest)
 gtest_discover_tests(tetodb_tests)
+
+# ---------------------------------------------------------
+# Google Benchmark Integration
+# ---------------------------------------------------------
+FetchContent_Declare(
+  googlebenchmark
+  URL https://github.com/google/benchmark/archive/refs/tags/v1.8.3.zip
+)
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark tests" FORCE)
+set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "Disable benchmark install" FORCE)
+FetchContent_MakeAvailable(googlebenchmark)
+
+add_executable(tetodb_benchmarks src/benchmarks.cpp)
+target_link_libraries(tetodb_benchmarks tetodb_lib benchmark::benchmark_main)
+
+if(WIN32)
+    target_link_libraries(tetodb_benchmarks shlwapi)
+    target_link_libraries(tetodb_benchmarks ws2_32)
+endif()
