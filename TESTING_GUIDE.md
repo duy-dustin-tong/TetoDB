@@ -1,8 +1,37 @@
 # TetoDB Testing Guide
 
-We use **Google Test (GTest)** to write and run unit tests for TetoDB's internal components. GTest is automatically downloaded and linked when you configure the project with CMake.
+We use **Google Test (GTest)** for unit tests and **Google Benchmark** for performance benchmarks. Both are downloaded and linked automatically via CMake.
 
-## Running Tests
+---
+
+## 📋 What is Covered
+
+### Unit Tests (`src/test_units.cpp`)
+
+| Test Suite | Component | What it Tests |
+|---|---|---|
+| `ValueTest` | `type/value.h` | Integer/VARCHAR arithmetic and comparison ops |
+| `DiskManagerTest` | `DiskManager` | Page allocation and raw read/write to disk |
+| `BufferPoolManagerTest` | `BufferPoolManager` | Page pinning, eviction, and fetch-from-disk |
+| `TwoQueueReplacerTest` | `TwoQueueReplacer` | LRU-K eviction policy, FIFO → LRU promotion |
+| `TupleTest` | `Tuple` | Row serialization and deserialization |
+| `LockManagerTest` | `LockManager` | Shared and exclusive lock acquisition |
+
+### Benchmarks (`src/benchmarks.cpp`)
+
+| Benchmark | Component | What it Measures |
+|---|---|---|
+| `BM_ValueIntegerAdd` | `Value` | ns per integer `Add` op |
+| `BM_ValueVarcharCompare` | `Value` | ns per varchar `CompareEquals` op |
+| `DiskManagerFixture/BM_DiskManagerSequentialWrite` | `DiskManager` | Raw sequential page write throughput (bytes/sec) |
+| `BPMFixture/BM_BPM_CacheHit100` | `BufferPoolManager` | 100% cache hit rate — pure cache throughput |
+| `BPMFixture/BM_BPM_RandomAccess` | `BufferPoolManager` | Random access — eviction pressure and cache miss cost |
+| `BPlusTreeFixture/BM_BTree_RandomLookups` | `BPlusTree` | Random 4-byte key lookups across 1,000-key index |
+| `BM_HashJoin_CorePressure` | Hash Join logic | Build + probe phase of a 1K×10K hash join |
+
+---
+
+## 🧪 Running Unit Tests
 
 ### 1. Build the Tests Target
 ```powershell
@@ -95,21 +124,39 @@ Google Test provides `EXPECT_*` (non-fatal, continues the test if it fails) and 
 
 ## 🚀 Performance Benchmarking
 
-TetoDB uses **Google Benchmark** to run microbenchmarks on core components. This helps us catch performance regressions during development.
+TetoDB uses **Google Benchmark** to run microbenchmarks and stress tests on core components. This helps catch performance regressions during development.
 
 ### 1. Build the Benchmarks Target
 ```powershell
-# From the TetoDB directory:
 cmake --build build --config Release --target tetodb_benchmarks
 ```
 
-### 2. Execute the Benchmarks
+### 2. Run All Benchmarks
 ```powershell
-# Run the executable directly:
 .\build\Release\tetodb_benchmarks.exe
 ```
 
-This will output a performance report showing Time, CPU time, and Iterations per second for each benchmarked function.
+### 3. Filter to Specific Benchmarks
+```powershell
+# Run only B+ Tree and Hash Join stress tests:
+.\build\Release\tetodb_benchmarks.exe --benchmark_filter="BPlusTree|HashJoin"
+
+# Run only Buffer Pool Manager benchmarks:
+.\build\Release\tetodb_benchmarks.exe --benchmark_filter="BPM"
+```
+
+Google Benchmark auto-determines iteration count so that each benchmark runs long enough to produce statistically reliable results. It reports:
+- **Time** — Wall-clock time per iteration
+- **CPU** — CPU time per iteration  
+- **Iterations** — How many times the loop ran
+
+---
+
+> [!IMPORTANT]
+> **BPlusTree Insert / Remove requires a real `Transaction*`**  
+> The B+ Tree's internal `FindLeafPage` unconditionally dereferences the transaction pointer for write operations. Always pass a valid `Transaction` object — never `nullptr` — when calling `Insert` or `Remove`. Reads (`GetValue`) can safely use `nullptr`.
+
+---
 
 ### How to Write a Benchmark
 
