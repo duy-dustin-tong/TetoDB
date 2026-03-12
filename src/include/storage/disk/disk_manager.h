@@ -38,7 +38,27 @@ private:
   std::fstream log_io_;
 
   std::stack<page_id_t> free_list_;
-  std::mutex latch_;
+
+  // ================================================================
+  // LOCK ORDERING CONTRACT
+  // ================================================================
+  // External callers (BPM) hold their own latch BEFORE calling into
+  // DiskManager. To prevent deadlocks, DiskManager uses three
+  // INDEPENDENT mutexes that never depend on each other:
+  //
+  //   io_latch_    — protects db_io_   (ReadPage / WritePage)
+  //   log_latch_   — protects log_io_  (WriteLog)
+  //   alloc_latch_ — protects free_list_ (AllocatePage / DeallocatePage)
+  //
+  // None of these locks are ever nested. The allowed acquisition
+  // order from any external caller is:
+  //   BPM::latch_ → alloc_latch_   (NewPage, DeletePage)
+  //   BPM::latch_ → io_latch_      (eviction writeback, FetchPage read)
+  //   (independent) → log_latch_   (WAL writes from LogManager)
+  // ================================================================
+  std::mutex io_latch_;
+  std::mutex log_latch_;
+  std::mutex alloc_latch_;
 
   std::atomic<page_id_t> next_page_id_;
 };

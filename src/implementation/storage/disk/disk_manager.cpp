@@ -70,7 +70,7 @@ DiskManager::DiskManager(std::filesystem::path db_file)
 }
 
 DiskManager::~DiskManager() {
-  std::scoped_lock<std::mutex> lock(latch_);
+  std::scoped_lock<std::mutex> lock(alloc_latch_);
 
   // Prevent writing .freelist if it's already empty
   if (free_list_.empty())
@@ -91,7 +91,7 @@ DiskManager::~DiskManager() {
 }
 
 bool DiskManager::WritePage(page_id_t page_id, const char *page_data) {
-  std::scoped_lock<std::mutex> lock(latch_);
+  std::scoped_lock<std::mutex> lock(io_latch_);
 
   db_io_.clear();
   size_t offset = static_cast<size_t>(page_id) * PAGE_SIZE;
@@ -109,7 +109,7 @@ bool DiskManager::WritePage(page_id_t page_id, const char *page_data) {
 }
 
 void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
-  std::scoped_lock<std::mutex> lock(latch_);
+  std::scoped_lock<std::mutex> lock(io_latch_);
 
   db_io_.clear();
   size_t offset = static_cast<size_t>(page_id) * PAGE_SIZE;
@@ -129,7 +129,7 @@ void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
 
 // NEW: Append-only log writing
 void DiskManager::WriteLog(const char *log_data, int size) {
-  std::scoped_lock<std::mutex> lock(latch_);
+  std::scoped_lock<std::mutex> lock(log_latch_);
 
   log_io_.clear();
 
@@ -145,7 +145,7 @@ void DiskManager::WriteLog(const char *log_data, int size) {
 }
 
 page_id_t DiskManager::AllocatePage() {
-  std::scoped_lock<std::mutex> lock(latch_);
+  std::scoped_lock<std::mutex> lock(alloc_latch_);
   if (!free_list_.empty()) {
     page_id_t id = free_list_.top();
     free_list_.pop();
@@ -155,7 +155,7 @@ page_id_t DiskManager::AllocatePage() {
 }
 
 void DiskManager::DeallocatePage(page_id_t page_id) {
-  std::scoped_lock<std::mutex> lock(latch_);
+  std::scoped_lock<std::mutex> lock(alloc_latch_);
   free_list_.push(page_id);
 }
 
