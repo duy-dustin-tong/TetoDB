@@ -24,10 +24,29 @@ This produces two executables in `build/Release/`:
 
 ```powershell
 cd build/Release
-./teto_main.exe
+./teto_main.exe mydb
 ```
 
-The server boots on **port 5432** by default and creates database files (`e2e.db`, `e2e.log`, etc.) in the current working directory.
+The first argument is the **database name**. TetoDB creates a folder called `data_mydb/` and stores all files inside it:
+
+```
+data_mydb/
+├── mydb.db         # Page data
+├── mydb.log        # Write-Ahead Log
+├── mydb.freelist   # Free page list
+└── mydb.catalog    # Table/index metadata
+```
+
+You can also specify a custom port:
+
+```powershell
+./teto_main.exe mydb 9000      # Listen on port 9000
+./teto_main.exe production     # Uses default port 5432
+```
+
+- If no arguments are given, the database name defaults to `mydb` and port defaults to `5432`.
+- If the database folder already exists, TetoDB **reopens** the existing database with full ARIES recovery.
+- If the folder doesn't exist, TetoDB creates a **fresh** database.
 
 To shut down the server, type `shutdown` into its terminal window.
 
@@ -102,7 +121,7 @@ This registers the `tetodb` dialect with SQLAlchemy.
 
 ```powershell
 cd build/Release
-./teto_main.exe
+./teto_main.exe mydb
 ```
 
 ### 3. Connect from Python
@@ -110,7 +129,7 @@ cd build/Release
 ```python
 from sqlalchemy import create_engine, text
 
-engine = create_engine("tetodb://127.0.0.1:5432/e2e")
+engine = create_engine("tetodb://127.0.0.1:5432/mydb")
 
 with engine.connect() as conn:
     conn.execute(text("CREATE TABLE products (id INTEGER PRIMARY KEY, name VARCHAR(50), price DECIMAL);"))
@@ -129,10 +148,10 @@ with engine.connect() as conn:
 ### 4. Using the ORM
 
 ```python
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-engine = create_engine("tetodb://127.0.0.1:5432/e2e")
+engine = create_engine("tetodb://127.0.0.1:5432/mydb")
 Base = declarative_base()
 
 class User(Base):
@@ -165,20 +184,21 @@ session.close()
 tetodb://host:port/database
 ```
 
-| Part       | Default       | Description                   |
-|------------|---------------|-------------------------------|
-| `host`     | `127.0.0.1`   | Server IP address             |
-| `port`     | `5432`         | Server listening port         |
-| `database` | `e2e`          | Database file name (no `.db`) |
+| Part       | Default       | Description                              |
+|------------|---------------|------------------------------------------|
+| `host`     | `127.0.0.1`   | Server IP address                        |
+| `port`     | `5432`        | Server listening port                    |
+| `database` | `mydb`        | Database name (matches server CLI arg)   |
 
 ---
 
 ## Important Notes & Gotchas
 
-### Database Files
-- TetoDB creates several files in the **server's working directory**: `.db` (pages), `.log` (WAL), `.freelist` (free pages), `.catalog` (table metadata).
+### Database Files & Storage
+- TetoDB creates a **dedicated folder** named `data_<dbname>/` containing all files for that database.
 - **Do not delete these files while the server is running.** You will corrupt your data.
-- To start fresh, stop the server and delete all generated files.
+- To start fresh, stop the server and delete the entire `data_<dbname>/` folder.
+- To reopen an existing database, just start the server with the same name — ARIES recovery replays the WAL automatically.
 
 ### Table Creation
 - `CREATE TABLE` must specify column types explicitly. Supported types: `INTEGER`, `BIGINT`, `SMALLINT`, `TINYINT`, `BOOLEAN`, `DECIMAL`/`FLOAT`/`DOUBLE`, `VARCHAR`/`TEXT`, `CHAR`, `TIMESTAMP`/`DATE`.
@@ -220,4 +240,4 @@ tetodb://host:port/database
 ### Network Protocol
 - TetoDB uses a custom binary protocol called **TetoWire** (not PostgreSQL wire protocol).
 - You **cannot** connect with `psql`, `pgAdmin`, or `psycopg2`. Use `teto_client.exe` or the Python `tetodb` driver.
-- Default port is **5432**. Change it in `server_main.cpp` if it conflicts with a local PostgreSQL installation.
+- Default port is **5432**. Pass a different port as the second CLI argument if it conflicts with a local PostgreSQL installation.
