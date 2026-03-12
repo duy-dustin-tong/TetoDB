@@ -744,6 +744,17 @@ std::unique_ptr<Expr> Parser::ParseBaseExpression() {
       throw std::runtime_error(
           "Syntax Error: Expected '(' after aggregate function");
     }
+
+    // COUNT(*) support: treat '*' as a dedicated aggregate argument.
+    if (upper_val == "COUNT" && Match(TokenType::SYMBOL, "*")) {
+      if (!Match(TokenType::SYMBOL, ")")) {
+        throw std::runtime_error(
+            "Syntax Error: Expected ')' after aggregate argument");
+      }
+      return std::make_unique<AggregateExpr>(
+          upper_val, std::make_unique<ColumnRefExpr>("", "*"));
+    }
+
     auto arg = ParseExpression();
     if (!Match(TokenType::SYMBOL, ")")) {
       throw std::runtime_error(

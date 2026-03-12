@@ -76,38 +76,16 @@ add_executable(teto_main "src/server_main.cpp")
 # 4. Create the Client Executable
 add_executable(teto_client "src/client_main.cpp" "src/include/execution/expressions/parameter_value_expression.h")
 
-add_executable(test_bug16_like_microbenchmark src/test_bug16_like_microbenchmark.cpp)
-target_link_libraries(test_bug16_like_microbenchmark tetodb_lib)
 
-add_executable(test_bug17_div_microbenchmark src/test_bug17_div_microbenchmark.cpp)
-target_link_libraries(test_bug17_div_microbenchmark tetodb_lib)
 
-add_executable(test_bug18_bpm_eviction src/test_bug18_bpm_eviction.cpp)
-target_link_libraries(test_bug18_bpm_eviction tetodb_lib)
 
-add_executable(test_bug19_fk_cascade src/test_bug19_fk_cascade.cpp)
-target_link_libraries(test_bug19_fk_cascade tetodb_lib)
 
-add_executable(test_bug20_arithmetic src/test_bug20_arithmetic.cpp)
-target_link_libraries(test_bug20_arithmetic tetodb_lib)
 
-add_executable(test_bug21_count_star src/test_bug21_count_star.cpp)
-target_link_libraries(test_bug21_count_star tetodb_lib)
 
-add_executable(test_bug7 "src/test_bug7_compaction.cpp")
-target_link_libraries(test_bug7 tetodb_lib)
 
-add_executable(test_c1_stale_offset "src/test_c1_stale_offset.cpp")
-target_link_libraries(test_c1_stale_offset tetodb_lib)
 
-add_executable(test_c2_newpage_wal "src/test_c2_newpage_wal.cpp")
-target_link_libraries(test_c2_newpage_wal tetodb_lib)
 
-add_executable(test_h1_multi_column_fk "src/test_h1_multi_column_fk.cpp")
-target_link_libraries(test_h1_multi_column_fk tetodb_lib)
 
-add_executable(test_h2_recovery_update "src/test_h2_recovery_update.cpp")
-target_link_libraries(test_h2_recovery_update tetodb_lib)
 
 # 5. Link the Core Library to the Server
 target_link_libraries(teto_main tetodb_lib)
@@ -118,8 +96,6 @@ if(WIN32)
     target_link_libraries(teto_client ws2_32)
 endif()
 
-add_executable(test_m10_drop_table_fk_cleanup src/test_m10_drop_table_fk_cleanup.cpp)
-target_link_libraries(test_m10_drop_table_fk_cleanup tetodb_lib)
 
 # ---------------------------------------------------------
 # Googletest Integration

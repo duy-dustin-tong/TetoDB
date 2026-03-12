@@ -1,6 +1,0 @@
-TABLE cec 0
-COLUMN abc 4
-COLUMN def 4
-END
-INDEX pk_cec 0 -1 1 1 0 
-INDEX unique_cec_def 0 -1 1 1 1 
