@@ -88,6 +88,13 @@ id | name
 
 SELECT 2
 
+tetodb> SELECT COUNT(*) FROM users;
+count
+-----
+2
+
+SELECT 1
+
 tetodb> UPDATE users SET name = 'Alice Z' WHERE id = 1;
 UPDATE 1
 
@@ -214,6 +221,12 @@ tetodb://host:port/database
   INSERT INTO users (id, name) VALUES (1, 'Alice');
   ```
 
+### Query Features (Current)
+- Supported core statements include `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `CREATE TABLE`, `DROP TABLE`, `CREATE INDEX`, and `DROP INDEX`.
+- Aggregates include `COUNT(*)`, `COUNT(expr)`, `SUM`, `MIN`, `MAX`, and `AVG`/`AVERAGE`.
+- `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`/`OFFSET`, `JOIN`, `IN`, `LIKE`/`ILIKE`, CTEs (`WITH`), and set operations (`UNION`, `INTERSECT`, `EXCEPT`) are available.
+- `EXPLAIN` is available for inspecting plans.
+
 ### Transactions
 - TetoDB supports `BEGIN`, `COMMIT`, and `ROLLBACK`.
 - Without an explicit `BEGIN`, each statement runs in **autocommit mode**.
@@ -230,6 +243,13 @@ tetodb://host:port/database
 - **No ALTER TABLE**: Schema modifications after creation are not supported.
 - **No auto-increment**: Primary keys must be provided explicitly.
 - **Parameter style**: The driver uses client-side `?` parameter substitution. Values are escaped, but avoid user-controlled input in raw SQL where possible.
+
+### Web App Compatibility Notes (FastAPI + SQLAlchemy)
+- For startup migrations/seeding in demo apps, prefer small idempotent SQL statements and explicit error handling; if a statement fails in a transaction, issue `ROLLBACK` before continuing.
+- Avoid assuming `DROP TABLE IF EXISTS` support; emulate it by attempting `DROP TABLE` and ignoring "table not found" errors.
+- For portability across current builds, use explicit `CREATE UNIQUE INDEX ...` statements instead of relying only on inline `UNIQUE` column constraints.
+- If your app uses optional foreign keys, validate parent existence before insert/update and ensure nullable FK handling matches your server build behavior.
+- Browser CORS errors often mask backend `500` errors. Check backend logs first; once the API returns `2xx`, CORS headers are emitted normally by FastAPI middleware.
 
 ### Performance Tips
 - Create **indexes** on columns you frequently filter by: `CREATE INDEX idx_name ON table (column);`
