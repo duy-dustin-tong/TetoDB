@@ -4,7 +4,10 @@
 
 #include <algorithm>
 #include <cstring>
+#include <ctime>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -107,6 +110,30 @@ public:
   inline double GetAsDecimal() const { return val_.decimal_; }
   inline bool GetAsBoolean() const { return val_.boolean_; }
   inline std::string GetAsString() const { return str_value_; }
+  inline int64_t GetAsTimestamp() const { return val_.bigint_; } // epoch seconds
+
+  // Parse "YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS" into epoch seconds
+  static int64_t ParseTimestamp(const std::string &s) {
+    struct std::tm tm = {};
+    std::istringstream ss(s);
+    // Try full timestamp first
+    ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+    if (ss.fail()) {
+      // Fall back to date-only
+      ss.clear();
+      ss.str(s);
+      ss >> std::get_time(&tm, "%Y-%m-%d");
+      if (ss.fail()) {
+        throw std::runtime_error("Invalid date/timestamp format: '" + s +
+                                 "'. Expected YYYY-MM-DD or YYYY-MM-DD HH:MM:SS");
+      }
+    }
+#ifdef _WIN32
+    return static_cast<int64_t>(_mkgmtime(&tm));
+#else
+    return static_cast<int64_t>(timegm(&tm));
+#endif
+  }
 
   inline bool IsNull() const { return is_null_; }
 

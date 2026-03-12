@@ -32,6 +32,18 @@ bool InsertExecutor::Next(Tuple *tuple, RID *rid) {
     raw_values.push_back(
         expr->Evaluate(nullptr, schema, exec_ctx_->GetParams()));
   }
+
+  // --- Type coercion: VARCHAR → TIMESTAMP ---
+  for (uint32_t i = 0; i < schema->GetColumnCount() && i < raw_values.size(); i++) {
+    if (schema->GetColumn(i).GetTypeId() == TypeId::TIMESTAMP &&
+        (raw_values[i].GetTypeId() == TypeId::VARCHAR ||
+         raw_values[i].GetTypeId() == TypeId::CHAR) &&
+        !raw_values[i].IsNull()) {
+      int64_t epoch = Value::ParseTimestamp(raw_values[i].GetAsString());
+      raw_values[i] = Value(TypeId::TIMESTAMP, epoch);
+    }
+  }
+
   Tuple to_insert(raw_values, schema);
 
   // ==========================================

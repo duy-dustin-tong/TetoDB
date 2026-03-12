@@ -2,6 +2,9 @@
 
 #include "type/value.h"
 #include <stdexcept>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
 
 namespace tetodb {
 
@@ -21,6 +24,8 @@ double Value::CastAsDouble() const {
     return static_cast<double>(val_.bigint_);
   case TypeId::DECIMAL:
     return val_.decimal_;
+  case TypeId::TIMESTAMP:
+    return static_cast<double>(val_.bigint_);
   default:
     throw std::runtime_error("Type error: Cannot cast non-numeric to double.");
   }
@@ -38,6 +43,8 @@ int64_t Value::CastAsBigInt() const {
     return val_.bigint_;
   case TypeId::DECIMAL:
     return static_cast<int64_t>(val_.decimal_);
+  case TypeId::TIMESTAMP:
+    return val_.bigint_;
   default:
     throw std::runtime_error("Type error: Cannot cast non-numeric to BigInt.");
   }
@@ -136,6 +143,8 @@ uint32_t Value::GetSize() const {
     return 8;
   case TypeId::DECIMAL:
     return 8;
+  case TypeId::TIMESTAMP:
+    return 8;
   case TypeId::VARCHAR:
   case TypeId::CHAR:
     return 4 + static_cast<uint32_t>(str_value_.length());
@@ -163,6 +172,9 @@ uint32_t Value::SerializeTo(char *storage) const {
     return 8;
   case TypeId::DECIMAL:
     memcpy(storage, &val_.decimal_, 8);
+    return 8;
+  case TypeId::TIMESTAMP:
+    memcpy(storage, &val_.bigint_, 8);
     return 8;
   case TypeId::VARCHAR:
   case TypeId::CHAR: {
@@ -208,6 +220,11 @@ Value Value::DeserializeFrom(const char *storage, TypeId type) {
     memcpy(&d, storage, 8);
     return Value(type, d);
   }
+  case TypeId::TIMESTAMP: {
+    int64_t ts;
+    memcpy(&ts, storage, 8);
+    return Value(type, ts);
+  }
   case TypeId::VARCHAR:
   case TypeId::CHAR: {
     uint32_t len;
@@ -243,6 +260,8 @@ bool Value::CompareEquals(const Value &other) const {
       return val_.bigint_ == other.val_.bigint_;
     case TypeId::DECIMAL:
       return val_.decimal_ == other.val_.decimal_;
+    case TypeId::TIMESTAMP:
+      return val_.bigint_ == other.val_.bigint_;
     case TypeId::VARCHAR:
     case TypeId::CHAR:
       return str_value_ == other.str_value_;
@@ -287,6 +306,8 @@ bool Value::CompareLessThan(const Value &other) const {
       return val_.bigint_ < other.val_.bigint_;
     case TypeId::DECIMAL:
       return val_.decimal_ < other.val_.decimal_;
+    case TypeId::TIMESTAMP:
+      return val_.bigint_ < other.val_.bigint_;
     case TypeId::VARCHAR:
     case TypeId::CHAR:
       return str_value_ < other.str_value_;
@@ -324,6 +345,8 @@ bool Value::CompareGreaterThan(const Value &other) const {
       return val_.bigint_ > other.val_.bigint_;
     case TypeId::DECIMAL:
       return val_.decimal_ > other.val_.decimal_;
+    case TypeId::TIMESTAMP:
+      return val_.bigint_ > other.val_.bigint_;
     case TypeId::VARCHAR:
     case TypeId::CHAR:
       return str_value_ > other.str_value_;
@@ -453,6 +476,9 @@ std::size_t Value::Hash() const {
   case TypeId::DECIMAL:
     hash = std::hash<double>()(val_.decimal_);
     break;
+  case TypeId::TIMESTAMP:
+    hash = std::hash<int64_t>()(val_.bigint_);
+    break;
   case TypeId::VARCHAR:
   case TypeId::CHAR:
     hash = std::hash<std::string>()(str_value_);
@@ -483,6 +509,18 @@ std::string Value::ToString() const {
     return std::to_string(val_.bigint_);
   case TypeId::DECIMAL:
     return std::to_string(val_.decimal_);
+  case TypeId::TIMESTAMP: {
+    time_t t = static_cast<time_t>(val_.bigint_);
+    struct std::tm tm;
+#ifdef _WIN32
+    gmtime_s(&tm, &t);
+#else
+    gmtime_r(&t, &tm);
+#endif
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+    return oss.str();
+  }
   case TypeId::VARCHAR:
   case TypeId::CHAR:
     return str_value_;

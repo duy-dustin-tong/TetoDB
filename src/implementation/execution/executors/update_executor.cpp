@@ -69,6 +69,17 @@ bool UpdateExecutor::Next(Tuple *tuple, RID *rid) {
       }
     }
 
+    // --- Type coercion: VARCHAR → TIMESTAMP ---
+    for (uint32_t i = 0; i < col_count; i++) {
+      if (schema->GetColumn(i).GetTypeId() == TypeId::TIMESTAMP &&
+          (new_values[i].GetTypeId() == TypeId::VARCHAR ||
+           new_values[i].GetTypeId() == TypeId::CHAR) &&
+          !new_values[i].IsNull()) {
+        int64_t epoch = Value::ParseTimestamp(new_values[i].GetAsString());
+        new_values[i] = Value(TypeId::TIMESTAMP, epoch);
+      }
+    }
+
     Tuple new_tuple(new_values, schema);
     RID new_rid = child_rid;
 

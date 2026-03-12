@@ -122,13 +122,20 @@ Token Lexer::ReadString() {
   std::string value;
   Advance(); // Skip the opening single quote
 
-  while (cursor_ < input_.length() && Peek() != '\'') {
-    value += Advance();
-  }
-
-  if (cursor_ < input_.length() && Peek() == '\'') {
-    Advance(); // Skip the closing single quote
-    return {TokenType::STRING, value};
+  while (cursor_ < input_.length()) {
+    if (Peek() == '\'') {
+      // Check for escaped single quote ('')
+      if (cursor_ + 1 < input_.length() && input_[cursor_ + 1] == '\'') {
+        value += '\'';   // Append one literal quote
+        Advance();       // Skip first quote
+        Advance();       // Skip second quote
+      } else {
+        Advance(); // Skip the closing single quote
+        return {TokenType::STRING, value};
+      }
+    } else {
+      value += Advance();
+    }
   }
 
   return {TokenType::INVALID, "UNTERMINATED_STRING"};
