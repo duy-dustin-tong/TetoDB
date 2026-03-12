@@ -509,7 +509,8 @@ void Catalog::SaveCatalog(const std::string &file_path) {
         << "\n";
     for (const auto &col : meta->schema_.GetColumns()) {
       out << "COLUMN " << col.GetName() << " "
-          << static_cast<int>(col.GetTypeId()) << "\n";
+          << static_cast<int>(col.GetTypeId()) << " "
+          << col.IsNullable() << "\n";
     }
     out << "END\n";
   }
@@ -575,8 +576,12 @@ void Catalog::LoadCatalog(const std::string &file_path,
     } else if (token == "COLUMN") {
       std::string col_name;
       int type_int;
+      int nullable_int = 0;
       ss >> col_name >> type_int;
-      current_cols.push_back(Column(col_name, static_cast<TypeId>(type_int)));
+      if (ss >> nullable_int) { /* read nullable flag if present */ }
+      Column col(col_name, static_cast<TypeId>(type_int));
+      col.SetNullable(nullable_int != 0);
+      current_cols.push_back(col);
     } else if (token == "INDEX") {
       std::string idx_name;
       table_oid_t tbl_oid;
