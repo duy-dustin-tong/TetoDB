@@ -368,58 +368,52 @@ bool Value::CompareGreaterThan(const Value &other) const {
 
 static bool MatchLikeStr(const char *str, const char *pattern,
                          bool case_insensitive) {
-  // If we reach the end of the pattern, we must also be at the end of the
-  // string
-  if (*pattern == '\0') {
-    return *str == '\0';
-  }
+  const char *s = str;
+  const char *p = pattern;
+  const char *star_idx = nullptr;
+  const char *match_idx = nullptr;
 
-  // Handle '%' wildcard: matches zero or more characters
-  if (*pattern == '%') {
-    // Skip consecutive '%' signs to avoid redundant recursion
-    while (*(pattern + 1) == '%') {
-      pattern++;
+  while (*s != '\0') {
+    // Current pattern character matches the string character or is '_'
+    bool char_match = false;
+    if (*p != '\0' && *p != '%' && *p != '_') {
+      if (case_insensitive) {
+        char_match = std::tolower(static_cast<unsigned char>(*s)) ==
+                     std::tolower(static_cast<unsigned char>(*p));
+      } else {
+        char_match = (*s == *p);
+      }
     }
 
-    // Try matching the rest of the pattern with decreasing lengths of the
-    // string
-    const char *s = str;
-    while (true) {
-      if (MatchLikeStr(s, pattern + 1, case_insensitive)) {
-        return true;
-      }
-      if (*s == '\0') {
-        return false;
-      }
+    if (*p == '_' || char_match) {
       s++;
+      p++;
+    } 
+    // Found a wildcard '%', save positions and advance pattern
+    else if (*p == '%') {
+      star_idx = p;
+      match_idx = s;
+      p++;
+    } 
+    // Mismatch, but we previously saw a '%'. Backtrack to the last '%', 
+    // advance the saved string position, and try again.
+    else if (star_idx != nullptr) {
+      p = star_idx + 1;
+      match_idx++;
+      s = match_idx;
+    } 
+    // Mismatch and no '%' to fall back on
+    else {
+      return false;
     }
   }
 
-  // If the string is empty but the pattern isn't (and it's not a '%'), it's a
-  // mismatch
-  if (*str == '\0') {
-    return false;
+  // Consume any remaining '%' at the end of the pattern
+  while (*p == '%') {
+    p++;
   }
 
-  // Handle '_' wildcard: matches exactly one arbitrary character
-  if (*pattern == '_') {
-    return MatchLikeStr(str + 1, pattern + 1, case_insensitive);
-  }
-
-  // Handle exact character matches (with optional case-insensitivity)
-  bool char_match = false;
-  if (case_insensitive) {
-    char_match = std::tolower(static_cast<unsigned char>(*str)) ==
-                 std::tolower(static_cast<unsigned char>(*pattern));
-  } else {
-    char_match = (*str == *pattern);
-  }
-
-  if (char_match) {
-    return MatchLikeStr(str + 1, pattern + 1, case_insensitive);
-  }
-
-  return false;
+  return *p == '\0';
 }
 
 bool Value::CompareLike(const Value &other) const {
