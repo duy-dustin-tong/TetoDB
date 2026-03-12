@@ -149,3 +149,121 @@ BENCHMARK_F(BPMFixture, BM_BPM_RandomAccess)(benchmark::State& state) {
         }
     }
 }
+
+#include "index/generic_key.h"
+#include "common/record_id.h"
+#include "storage/page/b_plus_tree_leaf_page.h"
+#include "storage/page/b_plus_tree_internal_page.h"
+#include "concurrency/transaction.h"
+
+namespace tetodb {
+// The B+ Tree implementation uses macros that require these exact type names to be defined in scope
+typedef GenericKey<4> KeyType;
+typedef RID ValueType;
+typedef GenericComparator<4> KeyComparator;
+}
+
+#include "index/b_plus_tree.h"
+
+class BPlusTreeFixture : public benchmark::Fixture {
+public:
+    void SetUp(const ::benchmark::State& state) {
+        db_path_ = "bm_bpt.db";
+        Cleanup();
+        dm_ = std::make_unique<tetodb::DiskManager>(db_path_);
+        replacer_ = std::make_unique<tetodb::TwoQueueReplacer>(500);
+        bpm_ = std::make_unique<tetodb::BufferPoolManager>(500, dm_.get(), replacer_.get());
+        
+        std::vector<tetodb::Column> cols = {tetodb::Column("key", tetodb::TypeId::INTEGER)};
+        schema_ = std::make_unique<tetodb::Schema>(cols);
+        tetodb::KeyComparator comp(tetodb::TypeId::INTEGER);
+        
+        tree_ = std::make_unique<tetodb::BPlusTree<tetodb::KeyType, tetodb::ValueType, tetodb::KeyComparator>>("bm_index", bpm_.get(), comp, LEAF_PAGE_SIZE, INTERNAL_PAGE_SIZE, INVALID_PAGE_ID);
+
+        // Pre-populate tree with 1,000 keys. Use a real Transaction to avoid null deref in FindLeafPage.
+        tetodb::Transaction txn(0);
+        for(int i = 0; i < 1000; i++) {
+            tetodb::KeyType k;
+            k.SetFromValue(tetodb::Value(tetodb::TypeId::INTEGER, i));
+            tetodb::ValueType rid(i, i);
+            tree_->Insert(k, rid, &txn);
+        }
+    }
+
+    void TearDown(const ::benchmark::State& state) {
+        tree_ = nullptr;
+        bpm_ = nullptr;
+        replacer_ = nullptr;
+        dm_ = nullptr;
+        Cleanup();
+    }
+    
+    void Cleanup() {
+        if (std::filesystem::exists(db_path_)) std::filesystem::remove(db_path_);
+        std::filesystem::path fl = db_path_; fl.replace_extension(".freelist");
+        if (std::filesystem::exists(fl)) std::filesystem::remove(fl);
+        std::filesystem::path log = db_path_; log.replace_extension(".log");
+        if (std::filesystem::exists(log)) std::filesystem::remove(log);
+    }
+
+    std::filesystem::path db_path_;
+    std::unique_ptr<tetodb::DiskManager> dm_;
+    std::unique_ptr<tetodb::TwoQueueReplacer> replacer_;
+    std::unique_ptr<tetodb::BufferPoolManager> bpm_;
+    std::unique_ptr<tetodb::Schema> schema_;
+    std::unique_ptr<tetodb::BPlusTree<tetodb::KeyType, tetodb::ValueType, tetodb::KeyComparator>> tree_;
+};
+
+// Benchmark rapid pinpoint lookups in a 1k-key B+ Tree
+BENCHMARK_F(BPlusTreeFixture, BM_BTree_RandomLookups)(benchmark::State& state) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> distr(0, 999);
+    
+    for (auto _ : state) {
+        int key_val = distr(gen);
+        tetodb::KeyType k;
+        k.SetFromValue(tetodb::Value(tetodb::TypeId::INTEGER, key_val));
+        std::vector<tetodb::ValueType> result;
+        tree_->GetValue(k, &result, nullptr);
+        
+        benchmark::DoNotOptimize(result);
+    }
+}
+
+// ==========================================
+// 5. Join Executor Stress Benchmarks
+// ==========================================
+#include "execution/executors/hash_join_executor.h"
+
+// Note: Testing an executor requires setting up dummy plan nodes and child executors,
+// which is extremely verbose. We'll simulate a tight loop inner Hash Join 
+// logic (hash table build + probe) to simulate the core CPU pressure of a DB join.
+static void BM_HashJoin_CorePressure(benchmark::State& state) {
+    // Simulate Left Table (1,000 rows)
+    std::vector<int32_t> left_keys;
+    for(int i = 0; i < 1000; i++) left_keys.push_back(i);
+    
+    // Simulate Right Table (10,000 rows, 10-to-1 relationship)
+    std::vector<int32_t> right_keys;
+    for(int i = 0; i < 10000; i++) right_keys.push_back(i % 1000);
+    
+    for (auto _ : state) {
+        // BUILD Phase
+        std::unordered_map<int32_t, int> hash_table;
+        for (int k : left_keys) {
+            hash_table[k] = 1;
+        }
+        
+        // PROBE Phase
+        int match_count = 0;
+        for (int k : right_keys) {
+            auto it = hash_table.find(k);
+            if (it != hash_table.end()) {
+                match_count++;
+            }
+        }
+        benchmark::DoNotOptimize(match_count);
+    }
+}
+BENCHMARK(BM_HashJoin_CorePressure);
