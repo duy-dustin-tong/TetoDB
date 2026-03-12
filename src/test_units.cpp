@@ -134,3 +134,115 @@ TEST_F(BufferPoolManagerTest, SimpleFetchAndEvict) {
     EXPECT_STREQ(p0_re->GetData(), "Page0");
     bpm.UnpinPage(pid0, false);
 }
+
+// ==========================================
+// 4. TwoQueueReplacer Tests
+// ==========================================
+#include "storage/buffer/two_queue_replacer.h"
+
+TEST(TwoQueueReplacerTest, BasicOperations) {
+    TwoQueueReplacer replacer(3);
+    
+    // Add 1, 2, 3
+    replacer.RecordAccess(1);
+    replacer.RecordAccess(2);
+    replacer.RecordAccess(3);
+    
+    // Mark them as evictable
+    replacer.SetEvictable(1, true);
+    replacer.SetEvictable(2, true);
+    replacer.SetEvictable(3, true);
+    
+    frame_id_t evicted;
+    
+    // 1 should be evicted first (FIFO)
+    EXPECT_TRUE(replacer.Evict(&evicted));
+    EXPECT_EQ(evicted, 1);
+    
+    // 2 should be evicted second
+    EXPECT_TRUE(replacer.Evict(&evicted));
+    EXPECT_EQ(evicted, 2);
+    
+    // Access 3 again -> moves to LRU queue
+    replacer.RecordAccess(3);
+    
+    // Pin 3 -> cannot be evicted
+    replacer.SetEvictable(3, false);
+    EXPECT_FALSE(replacer.Evict(&evicted));
+}
+
+// ==========================================
+// 5. Tuple Tests
+// ==========================================
+#include "storage/table/tuple.h"
+
+TEST(TupleTest, TupleSerialization) {
+    std::vector<Column> cols = {
+        Column("A", TypeId::INTEGER),
+        Column("B", TypeId::VARCHAR)
+    };
+    Schema schema(cols);
+
+    std::vector<Value> values = {
+        Value(TypeId::INTEGER, 42),
+        Value(TypeId::VARCHAR, "TetoDB")
+    };
+    Tuple tuple(values, &schema);
+
+    // Verify values BEFORE serialization
+    EXPECT_EQ(tuple.GetValue(&schema, 0).GetAsInteger(), 42);
+    EXPECT_STREQ(tuple.GetValue(&schema, 1).GetAsString().c_str(), "TetoDB");
+    
+    // Serialize
+    char buffer[PAGE_SIZE];
+    tuple.SerializeTo(buffer);
+
+    // Deserialize
+    Tuple recovered_tuple;
+    recovered_tuple.DeserializeFrom(buffer, tuple.GetSize());
+
+    // Verify values AFTER deserialization
+    EXPECT_EQ(recovered_tuple.GetValue(&schema, 0).GetAsInteger(), 42);
+    EXPECT_STREQ(recovered_tuple.GetValue(&schema, 1).GetAsString().c_str(), "TetoDB");
+}
+
+// ==========================================
+// 6. LockManager Tests
+// ==========================================
+#include "concurrency/lock_manager.h"
+#include "concurrency/transaction_manager.h"
+
+TEST(LockManagerTest, BasicSharedLocking) {
+    LockManager lock_mgr;
+    TransactionManager txn_mgr(&lock_mgr, nullptr);
+    
+    Transaction* txn1 = txn_mgr.Begin();
+    Transaction* txn2 = txn_mgr.Begin();
+    
+    RID rid(0, 0); // page 0, slot 0
+    
+    // Both can acquire Shared Lock
+    EXPECT_TRUE(lock_mgr.LockShared(txn1, rid));
+    EXPECT_TRUE(lock_mgr.LockShared(txn2, rid));
+    
+    // Clean up
+    txn_mgr.Commit(txn1);
+    txn_mgr.Commit(txn2);
+}
+
+TEST(LockManagerTest, ExclusiveLockBlocksShared) {
+    LockManager lock_mgr;
+    TransactionManager txn_mgr(&lock_mgr, nullptr);
+    
+    Transaction* txn1 = txn_mgr.Begin();
+    Transaction* txn2 = txn_mgr.Begin();
+    
+    RID rid(1, 1);
+    
+    // Txn1 gets Exclusive Lock
+    EXPECT_TRUE(lock_mgr.LockExclusive(txn1, rid));
+    
+    EXPECT_TRUE(lock_mgr.Unlock(txn1, rid));
+    txn_mgr.Commit(txn1);
+    txn_mgr.Commit(txn2);
+}
