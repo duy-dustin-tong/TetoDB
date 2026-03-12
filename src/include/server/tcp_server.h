@@ -29,7 +29,7 @@ namespace tetodb {
         void AcceptLoop();
         void HandleClient(SOCKET client_socket);
 
-        // PgWire Byte Formatting Helpers
+        // TetoWire Byte Formatting Helpers
         void WriteInt32(std::vector<char>& buf, int32_t val);
         void WriteInt16(std::vector<char>& buf, int16_t val);
         void WriteString(std::vector<char>& buf, const std::string& str);

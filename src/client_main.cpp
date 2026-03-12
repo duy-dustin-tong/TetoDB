@@ -1,5 +1,8 @@
 // client_main.cpp
+// TetoWire REPL Client for TetoDB
 
+#include <cstring>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -20,7 +23,8 @@ typedef int SOCKET;
 #define INVALID_SOCKET -1
 #endif
 
-// PgWire Byte Formatting Helpers
+// --- TetoWire Helpers ---
+
 void WriteInt32(std::vector<char> &buf, int32_t val) {
   uint32_t net_val = htonl(val);
   const char *p = reinterpret_cast<const char *>(&net_val);
@@ -32,7 +36,6 @@ void WriteString(std::vector<char> &buf, const std::string &str) {
   buf.push_back('\0');
 }
 
-// Helper to ensure we read exactly the required bytes
 bool RecvAll(SOCKET sock, char *buf, int len) {
   int total = 0;
   while (total < len) {
@@ -44,8 +47,37 @@ bool RecvAll(SOCKET sock, char *buf, int len) {
   return true;
 }
 
+// Read a full TetoWire packet: [1-byte type] [4-byte len] [payload]
+// Returns false if connection drops
+bool RecvPacket(SOCKET sock, char &type, std::vector<char> &payload) {
+  if (!RecvAll(sock, &type, 1))
+    return false;
+  char len_buf[4];
+  if (!RecvAll(sock, len_buf, 4))
+    return false;
+  uint32_t raw_len;
+  std::memcpy(&raw_len, len_buf, sizeof(uint32_t));
+  uint32_t payload_len = ntohl(raw_len) - 4;
+  payload.resize(payload_len);
+  if (payload_len > 0 && !RecvAll(sock, payload.data(), payload_len))
+    return false;
+  return true;
+}
+
+uint16_t ReadInt16(const char *p) {
+  uint16_t raw;
+  std::memcpy(&raw, p, sizeof(uint16_t));
+  return ntohs(raw);
+}
+
+int32_t ReadInt32(const char *p) {
+  uint32_t raw;
+  std::memcpy(&raw, p, sizeof(uint32_t));
+  return static_cast<int32_t>(ntohl(raw));
+}
+
 int main() {
-  std::cout << "Starting TetoDB PgWire Client...\n";
+  std::cout << "Starting TetoDB Client (TetoWire)...\n";
 
 #ifdef _WIN32
   WSADATA wsaData;
@@ -69,125 +101,132 @@ int main() {
     return 1;
   }
 
-  // 1. Send StartupMessage (PgWire v3.0)
-  std::vector<char> startup_payload;
-  WriteInt32(startup_payload, 196608); // Protocol Version 3.0
-  WriteString(startup_payload, "user");
-  WriteString(startup_payload, "postgres");
-  WriteString(startup_payload, "database");
-  WriteString(startup_payload, "postgres");
-  startup_payload.push_back('\0');
+  // Wait for initial ReadyForQuery
+  char type;
+  std::vector<char> payload;
+  if (!RecvPacket(sock, type, payload) || type != 'Z') {
+    std::cerr << "Failed to receive initial Ready signal.\n";
+    return 1;
+  }
 
-  std::vector<char> startup_packet;
-  WriteInt32(startup_packet, startup_payload.size() + 4);
-  startup_packet.insert(startup_packet.end(), startup_payload.begin(),
-                        startup_payload.end());
+  std::cout << "Connected to TetoDB.\n\n";
 
-  send(sock, startup_packet.data(), startup_packet.size(), 0);
-
-  // 2. Message Loop
-  char type_byte;
+  // REPL loop
   std::string statement_buffer;
+  while (true) {
+    // Prompt
+    if (statement_buffer.empty())
+      std::cout << "tetodb> ";
+    else
+      std::cout << "      > ";
 
-  while (recv(sock, &type_byte, 1, 0) > 0) {
-    char len_buf[4];
-    if (!RecvAll(sock, len_buf, 4))
-      break;
-    uint32_t raw_len;
-    std::memcpy(&raw_len, len_buf, sizeof(uint32_t));
-    uint32_t len = ntohl(raw_len) - 4;
-
-    std::vector<char> payload(len);
-    if (len > 0 && !RecvAll(sock, payload.data(), len))
+    std::string line_input;
+    if (!std::getline(std::cin, line_input))
       break;
 
-    if (type_byte == 'Z') { // ReadyForQuery
-      // Prompt user for input
-      while (true) {
-        if (statement_buffer.empty())
-          std::cout << "tetodb> ";
-        else
-          std::cout << "      > ";
+    if (statement_buffer.empty() &&
+        (line_input == "exit" || line_input == "quit"))
+      break;
+    if (statement_buffer.empty() && line_input.empty())
+      continue;
 
-        std::string line_input;
-        if (!std::getline(std::cin, line_input))
-          goto end_client;
+    statement_buffer += line_input + "\n";
+    if (statement_buffer.find(';') == std::string::npos)
+      continue;
 
-        if (statement_buffer.empty() &&
-            (line_input == "exit" || line_input == "quit"))
-          goto end_client;
-        if (statement_buffer.empty() && line_input.empty())
-          continue;
+    // Send Query packet: 'Q' [4-byte len] [sql\0]
+    std::vector<char> q_packet;
+    q_packet.push_back('Q');
+    uint32_t sql_len = static_cast<uint32_t>(statement_buffer.length() + 1 + 4);
+    WriteInt32(q_packet, sql_len);
+    WriteString(q_packet, statement_buffer);
+    send(sock, q_packet.data(), static_cast<int>(q_packet.size()), 0);
 
-        statement_buffer += line_input + "\n";
-        if (statement_buffer.find(';') != std::string::npos)
-          break;
+    statement_buffer.clear();
+
+    // Read response packets until 'Z' (ReadyForQuery)
+    std::vector<std::string> col_names;
+    bool got_header = false;
+
+    while (true) {
+      char rtype;
+      std::vector<char> rpayload;
+      if (!RecvPacket(sock, rtype, rpayload)) {
+        std::cerr << "Connection lost.\n";
+        goto end_client;
       }
 
-      // Send Simple Query ('Q')
-      std::vector<char> q_packet;
-      q_packet.push_back('Q');
-      WriteInt32(q_packet, statement_buffer.length() + 1 + 4);
-      WriteString(q_packet, statement_buffer);
-      send(sock, q_packet.data(), q_packet.size(), 0);
-
-      statement_buffer.clear();
-    } else if (type_byte == 'D') { // DataRow
-      // Unpack all columns in the DataRow
-      if (len >= 2) {
-        uint16_t raw_num_cols;
-        std::memcpy(&raw_num_cols, payload.data(), sizeof(uint16_t));
-        uint16_t num_cols = ntohs(raw_num_cols);
-        uint32_t offset = 2;
-        for (uint16_t i = 0; i < num_cols; i++) {
-          if (offset + 4 > len)
-            break;
-          uint32_t raw_col_len;
-          std::memcpy(&raw_col_len, payload.data() + offset, sizeof(uint32_t));
-          uint32_t col_len = ntohl(raw_col_len);
-          offset += 4;
-          if (col_len == 0xFFFFFFFF) {
+      if (rtype == 'T') {
+        // RowDescription: [int16 col_count] [string name, string type] ...
+        const char *p = rpayload.data();
+        uint16_t col_count = ReadInt16(p);
+        p += 2;
+        col_names.clear();
+        for (uint16_t i = 0; i < col_count; i++) {
+          std::string name(p);
+          p += name.length() + 1;
+          std::string type_name(p); // skip type for display
+          p += type_name.length() + 1;
+          col_names.push_back(name);
+        }
+        // Print column header
+        if (!col_names.empty()) {
+          for (size_t i = 0; i < col_names.size(); i++) {
+            if (i > 0) std::cout << " | ";
+            std::cout << col_names[i];
+          }
+          std::cout << "\n";
+          // Separator
+          for (size_t i = 0; i < col_names.size(); i++) {
+            if (i > 0) std::cout << "-+-";
+            std::cout << std::string(col_names[i].length(), '-');
+          }
+          std::cout << "\n";
+          got_header = true;
+        }
+      } else if (rtype == 'D') {
+        // DataRow: [int16 col_count] [int32 len, bytes data] ...
+        const char *p = rpayload.data();
+        uint16_t col_count = ReadInt16(p);
+        p += 2;
+        for (uint16_t i = 0; i < col_count; i++) {
+          if (i > 0) std::cout << " | ";
+          int32_t col_len = ReadInt32(p);
+          p += 4;
+          if (col_len == -1) {
             std::cout << "NULL";
           } else if (col_len > 0) {
-            if (offset + col_len > len)
-              break;
-            std::cout << std::string(payload.data() + offset, col_len);
-            offset += col_len;
+            std::cout << std::string(p, col_len);
+            p += col_len;
           }
-          if (i < num_cols - 1)
-            std::cout << " | ";
         }
         std::cout << "\n";
+      } else if (rtype == 'C') {
+        // CommandComplete
+        std::string status(rpayload.data());
+        if (got_header)
+          std::cout << "\n";
+        std::cout << status << "\n";
+      } else if (rtype == 'E') {
+        // Error
+        std::string err(rpayload.data());
+        std::cout << "ERROR: " << err << "\n";
+      } else if (rtype == 'Z') {
+        // ReadyForQuery — done with this query
+        break;
       }
-    } else if (type_byte == 'C') { // CommandComplete
-      std::cout << std::string(payload.data()) << "\n";
-    } else if (type_byte == 'E') { // ErrorResponse
-      std::cout << "Server Error: ";
-      // The 'E' payload consists of one or more fields of format: [FieldType:1
-      // char][String:NULL string] We'll just look for the 'M' (Message) field
-      // or print raw if not formatted well.
-      size_t i = 0;
-      bool found_msg = false;
-      while (i < payload.size()) {
-        char field_type = payload[i++];
-        if (field_type == '\0')
-          break;
-        std::string field_str(payload.data() + i);
-        if (field_type == 'M') {
-          std::cout << field_str;
-          found_msg = true;
-          break;
-        }
-        i += field_str.length() + 1;
-      }
-      if (!found_msg)
-        std::cout << std::string(payload.data());
-      std::cout << "\n";
     }
-    // Ignores 'R' (Authentication), 'T' (RowDescription)
   }
 
 end_client:
+  // Send disconnect
+  {
+    std::vector<char> x_packet;
+    x_packet.push_back('X');
+    WriteInt32(x_packet, 4);
+    send(sock, x_packet.data(), static_cast<int>(x_packet.size()), 0);
+  }
+
   CLOSE_SOCKET(sock);
 #ifdef _WIN32
   WSACleanup();

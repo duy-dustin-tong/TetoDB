@@ -167,6 +167,8 @@ private:
   std::atomic<view_oid_t> next_view_oid_{0};
   std::unordered_map<view_oid_t, std::unique_ptr<ViewMetadata>> views_;
   std::unordered_map<std::string, view_oid_t> view_names_;
+
+  bool is_loading_{false};
 };
 
 } // namespace tetodb

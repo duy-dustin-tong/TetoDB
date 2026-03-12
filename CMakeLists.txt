@@ -103,6 +103,9 @@ target_link_libraries(test_c2_newpage_wal tetodb_lib)
 add_executable(test_h1_multi_column_fk "src/test_h1_multi_column_fk.cpp")
 target_link_libraries(test_h1_multi_column_fk tetodb_lib)
 
+add_executable(test_h2_recovery_update "src/test_h2_recovery_update.cpp")
+target_link_libraries(test_h2_recovery_update tetodb_lib)
+
 # 5. Link the Core Library to the Server
 target_link_libraries(teto_main tetodb_lib)
 
@@ -111,3 +114,6 @@ if(WIN32)
     target_link_libraries(teto_main ws2_32)
     target_link_libraries(teto_client ws2_32)
 endif()
+
+add_executable(test_m10_drop_table_fk_cleanup src/test_m10_drop_table_fk_cleanup.cpp)
+target_link_libraries(test_m10_drop_table_fk_cleanup tetodb_lib)

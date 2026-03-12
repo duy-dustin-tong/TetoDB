@@ -74,84 +74,7 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
                                          ClientSession &session) {
   QueryResult res;
 
-  // =========================================================
-  // ORM COMPATIBILITY INTERCEPT
-  // Bypasses the Parser for standard PostgreSQL metadata checks
-  // =========================================================
-  std::string lower_sql = sql;
-  std::transform(lower_sql.begin(), lower_sql.end(), lower_sql.begin(),
-                 ::tolower);
-
-  if (lower_sql.find("select pg_catalog.version()") != std::string::npos ||
-      lower_sql.find("select version()") != std::string::npos) {
-    res.owned_schema = std::make_shared<Schema>(
-        std::vector<Column>{Column("version", TypeId::VARCHAR)});
-    res.schema = res.owned_schema.get();
-    res.rows.push_back(Tuple(
-        {Value(TypeId::VARCHAR, "PostgreSQL 14.0 on TetoDB")}, res.schema));
-    res.status_msg = "SELECT 1";
-    return res;
-  }
-
-  if (lower_sql.find("select current_schema()") != std::string::npos) {
-    res.owned_schema = std::make_shared<Schema>(
-        std::vector<Column>{Column("current_schema", TypeId::VARCHAR)});
-    res.schema = res.owned_schema.get();
-    res.rows.push_back(Tuple({Value(TypeId::VARCHAR, "public")}, res.schema));
-    res.status_msg = "SELECT 1";
-    return res;
-  }
-
-  if (lower_sql.find("show standard_conforming_strings") != std::string::npos) {
-    res.owned_schema = std::make_shared<Schema>(std::vector<Column>{
-        Column("standard_conforming_strings", TypeId::VARCHAR)});
-    res.schema = res.owned_schema.get();
-    res.rows.push_back(Tuple({Value(TypeId::VARCHAR, "on")}, res.schema));
-    res.status_msg = "SHOW";
-    return res;
-  }
-
-  // Generic fallback for any other SHOW configuration commands
-  if (lower_sql.rfind("show ", 0) == 0) {
-    res.owned_schema = std::make_shared<Schema>(
-        std::vector<Column>{Column("setting", TypeId::VARCHAR)});
-    res.schema = res.owned_schema.get();
-    res.rows.push_back(Tuple({Value(TypeId::VARCHAR, "on")}, res.schema));
-    res.status_msg = "SHOW";
-    return res;
-  }
-
-  // Generic fallback for any SET configuration commands
-  if (lower_sql.rfind("set ", 0) == 0) {
-    res.status_msg = "SET";
-    return res;
-  }
-
-  // --- NEW: Intercept SQLAlchemy's String Encoding Pings ---
-  if (lower_sql.find("cast('test plain returns'") != std::string::npos ||
-      lower_sql.find("cast('test unicode returns'") != std::string::npos) {
-    res.owned_schema = std::make_shared<Schema>(
-        std::vector<Column>{Column("anon_1", TypeId::VARCHAR)});
-    res.schema = res.owned_schema.get();
-    res.rows.push_back(
-        Tuple({Value(TypeId::VARCHAR, "test plain returns")}, res.schema));
-    res.status_msg = "SELECT 1";
-    return res;
-  }
-
-  // --- PostgreSQL System Catalog Queries ---
-  if (lower_sql.find("pg_type") != std::string::npos ||
-      lower_sql.find("pg_range") != std::string::npos ||
-      lower_sql.find("pg_catalog") != std::string::npos ||
-      lower_sql.find("pg_attribute") != std::string::npos ||
-      lower_sql.find("information_schema") != std::string::npos) {
-    res.owned_schema = std::make_shared<Schema>(
-        std::vector<Column>{Column("name", TypeId::VARCHAR)});
-    res.schema = res.owned_schema.get();
-    res.status_msg = "SELECT 0";
-    return res;
-  }
-  // =========================================================
+  // (ORM intercepts removed — our custom TetoDialect handles everything)
 
   bool is_autocommit = (session.active_txn == nullptr);
   Transaction *exec_txn = nullptr;
@@ -341,30 +264,42 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
       Optimizer optimizer(catalog_.get());
       const AbstractPlanNode *physical_plan = optimizer.Optimize(logical_plan);
 
-      auto root_executor =
-          ExecutionEngine::CreateExecutor(physical_plan, &exec_ctx);
-      root_executor->Init();
-
-      if (root_executor->GetOutputSchema()) {
-        res.owned_schema =
-            std::make_shared<Schema>(*root_executor->GetOutputSchema());
+      // --- M3 FIX: Intercept EXPLAIN before Execution ---
+      if (ast->type_ == ASTNodeType::EXPLAIN_STATEMENT) {
+        std::ostringstream oss;
+        PrintPlanTree(physical_plan, oss);
+        
+        res.owned_schema = std::make_shared<Schema>(
+            std::vector<Column>{Column("EXPLAIN", TypeId::VARCHAR)});
         res.schema = res.owned_schema.get();
-      }
-      Tuple tuple;
-      RID rid;
-      while (root_executor->Next(&tuple, &rid)) {
-        res.rows.push_back(tuple);
-      }
+        res.rows.push_back(Tuple({Value(TypeId::VARCHAR, oss.str())}, res.schema));
+        res.status_msg = "EXPLAIN";
+      } else {
+        auto root_executor =
+            ExecutionEngine::CreateExecutor(physical_plan, &exec_ctx);
+        root_executor->Init();
 
-      PlanType root_type = physical_plan->GetPlanType();
-      if (root_type == PlanType::Insert)
-        res.status_msg = "INSERT 0 " + std::to_string(res.rows.size());
-      else if (root_type == PlanType::Update)
-        res.status_msg = "UPDATE " + std::to_string(res.rows.size());
-      else if (root_type == PlanType::Delete)
-        res.status_msg = "DELETE " + std::to_string(res.rows.size());
-      else
-        res.status_msg = "SELECT " + std::to_string(res.rows.size());
+        if (root_executor->GetOutputSchema()) {
+          res.owned_schema =
+              std::make_shared<Schema>(*root_executor->GetOutputSchema());
+          res.schema = res.owned_schema.get();
+        }
+        Tuple tuple;
+        RID rid;
+        while (root_executor->Next(&tuple, &rid)) {
+          res.rows.push_back(tuple);
+        }
+
+        PlanType root_type = physical_plan->GetPlanType();
+        if (root_type == PlanType::Insert)
+          res.status_msg = "INSERT 0 " + std::to_string(res.rows.size());
+        else if (root_type == PlanType::Update)
+          res.status_msg = "UPDATE " + std::to_string(res.rows.size());
+        else if (root_type == PlanType::Delete)
+          res.status_msg = "DELETE " + std::to_string(res.rows.size());
+        else
+          res.status_msg = "SELECT " + std::to_string(res.rows.size());
+      }
     }
 
     // Release the checkpoint shared lock BEFORE commit/abort.

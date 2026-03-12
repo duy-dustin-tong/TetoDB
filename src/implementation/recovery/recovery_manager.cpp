@@ -110,7 +110,8 @@ void RecoveryManager::Redo() {
     } else if (type == LogRecordType::INSERT ||
                type == LogRecordType::MARKDELETE ||
                type == LogRecordType::ROLLBACKDELETE ||
-               type == LogRecordType::APPLYDELETE) {
+               type == LogRecordType::APPLYDELETE ||
+               type == LogRecordType::UPDATE) {
 
       Page *page = bpm_->FetchPage(rid.GetPageId());
       if (page != nullptr) {
@@ -139,6 +140,9 @@ void RecoveryManager::Redo() {
             table_page->RollbackDelete(rid, log_record.GetNewTuple());
           } else if (type == LogRecordType::APPLYDELETE) {
             table_page->ApplyDelete(rid);
+          } else if (type == LogRecordType::UPDATE) {
+            Tuple dummy_old_tuple;
+            table_page->UpdateTuple(log_record.GetNewTuple(), &dummy_old_tuple, rid);
           }
 
           table_page->SetLSN(log_record.GetLSN());
@@ -248,6 +252,26 @@ void RecoveryManager::Undo() {
           WritePageGuard guard(bpm_, page);
           auto table_page = guard.As<TablePage>();
           table_page->RollbackDelete(rid, log_record.GetNewTuple());
+          guard.MarkDirty();
+        }
+      } else if (type == LogRecordType::UPDATE) {
+        // 1. Emit CLR
+        LogRecord clr_record(txn_id, active_txn_[txn_id],
+                             LogRecordType::UPDATE, rid,
+                             log_record.GetNewTuple(),
+                             log_record.GetOldTuple());
+        clr_record.SetCLR(true);
+        clr_record.SetUndoNextLSN(log_record.GetPrevLSN());
+        lsn_t clr_lsn = log_mgr_->AppendLogRecord(&clr_record);
+        active_txn_[txn_id] = clr_lsn; // Update tip to the CLR
+
+        // 2. Physical Undo
+        Page *page = bpm_->FetchPage(rid.GetPageId());
+        if (page != nullptr) {
+          WritePageGuard guard(bpm_, page);
+          auto table_page = guard.As<TablePage>();
+          Tuple dummy_old_tuple;
+          table_page->UpdateTuple(log_record.GetOldTuple(), &dummy_old_tuple, rid);
           guard.MarkDirty();
         }
       } else if (type == LogRecordType::NEWPAGE) {
