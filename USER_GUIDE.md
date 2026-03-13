@@ -123,151 +123,120 @@ Multi-line statements are supported — the client accumulates input until it se
 
 ---
 
-## Using with SQLAlchemy (Python)
+## Building Flawless Apps with SQLAlchemy (Python)
 
-TetoDB ships with a native Python driver and SQLAlchemy dialect. This lets you use it just like SQLite or PostgreSQL from any Python application.
+TetoDB ships with a native Python DBAPI driver and SQLAlchemy dialect. However, because TetoDB is a streamlined engine built from scratch—without full PostgreSQL feature bloat or `information_schema`—you must follow specific integration patterns to reliably build applications.
 
 ### 1. Install the Driver
+Register the `tetodb` dialect with SQLAlchemy by installing the driver package:
 
 ```powershell
 cd TetoDB/python
 pip install -e .
 ```
 
-This registers the `tetodb` dialect with SQLAlchemy.
-
-### 2. Make Sure the Server is Running
-
-```powershell
-cd build/Release
-./teto_main.exe mydb
-```
-
-### 3. Connect from Python
+### 2. Setup the Engine and Session
+Always use SQLAlchemy's `SessionLocal` dependency pattern. **Avoid using `engine.raw_connection()`**, as executing raw `BEGIN;` commands on the underlying DBAPI connection will conflict with SQLAlchemy's connection pooling and cause fatal `Failed to acquire Shared Lock` database errors!
 
 ```python
-from sqlalchemy import create_engine, text
-
-engine = create_engine("tetodb://127.0.0.1:5432/mydb")
-
-with engine.connect() as conn:
-    conn.execute(text("CREATE TABLE products (id INTEGER PRIMARY KEY, name VARCHAR(50), price DECIMAL);"))
-    conn.execute(text("INSERT INTO products VALUES (1, 'Widget', 9.99);"))
-    conn.execute(text("INSERT INTO products VALUES (2, 'Gadget', 24.50);"))
-    conn.commit()
-
-    result = conn.execute(text("SELECT * FROM products;"))
-    for row in result:
-        print(row)
-
-    conn.execute(text("DROP TABLE products;"))
-    conn.commit()
-```
-
-### 4. Using the ORM
-
-```python
-from sqlalchemy import create_engine, Column, Integer, String, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-engine = create_engine("tetodb://127.0.0.1:5432/mydb")
+# The dialect must be tetodb://
+DATABASE_URL = "tetodb://127.0.0.1:9090/mydb"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    name = Column(String)
-
-Session = sessionmaker(bind=engine)
-
-# Create table manually (TetoDB doesn't support Base.metadata.create_all yet)
-with engine.connect() as conn:
-    conn.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR(50));"))
-    conn.commit()
-
-# Use the ORM
-session = Session()
-session.execute(text("INSERT INTO users VALUES (1, 'Dustin');"))
-session.commit()
-
-result = session.execute(text("SELECT * FROM users WHERE id = 1;"))
-row = result.fetchone()
-print(f"User: id={row[0]}, name={row[1]}")
-
-session.close()
+# Generator for FastAPI or context managers
+def get_session():
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
 ```
 
-### Connection URL Format
+### 3. Schema Initialization Pattern
+TetoDB currently lacks `ALTER TABLE` and `IF NOT EXISTS` syntax, and SQLAlchemy's `Base.metadata.create_all(engine)` is **not supported**. 
 
+To initialize your database perfectly on app startup without crashing if tables already exist, use a `safe_exec` wrapper:
+
+```python
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+def safe_exec(session: Session, sql: str) -> bool:
+    """Executes a query and swallows duplicate table/index errors."""
+    try:
+        session.execute(text(sql))
+        session.commit()
+        return True
+    except Exception:
+        # Table or Index already exists
+        session.rollback()
+        return False
+
+# Call this on app startup
+def init_schema(session: Session):
+    safe_exec(session, "CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR(50) NOT NULL);")
+    safe_exec(session, "CREATE TABLE posts (id INTEGER PRIMARY KEY, user_id INTEGER, title VARCHAR(100), FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE);")
+    safe_exec(session, "CREATE INDEX idx_posts_user ON posts (user_id);")
 ```
-tetodb://host:port/database
+
+### 4. The ID Generation Pattern (No Auto-Increment)
+TetoDB has no `AUTOINCREMENT` or `SERIAL` columns. You must calculate primary keys explicitly. Crucially, querying `SELECT MAX(id)` on an **empty table** triggers a `ClosedError` from the DBAPI driver because no columns are returned.
+
+**You must always check `COUNT(*)` first:**
+
+```python
+def next_id(session: Session, table_name: str) -> int:
+    """Safely calculates the next auto-increment ID in TetoDB."""
+    try:
+        # 1. Check if the table is empty to prevent ClosedError
+        count = int(session.execute(text(f"SELECT COUNT(*) FROM {table_name};")).scalar() or 0)
+        if count == 0:
+            return 1
+    except Exception:
+        pass
+    
+    try:
+        # 2. Safely grab MAX(id) if rows exist
+        max_id = session.execute(text(f"SELECT MAX(id) FROM {table_name};")).scalar()
+        return int(max_id or 0) + 1
+    except Exception:
+        return 1
 ```
 
-| Part       | Default       | Description                              |
-|------------|---------------|------------------------------------------|
-| `host`     | `127.0.0.1`   | Server IP address                        |
-| `port`     | `5432`        | Server listening port                    |
-| `database` | `mydb`        | Database name (matches server CLI arg)   |
+### 5. Transactions and Savepoints
+TetoDB supports nested transactions natively, allowing partial rollbacks without aborting the entire process. SQLAlchemy fully understands this via the `session.begin_nested()` context manager.
 
----
+```python
+def seed_categories_and_posts(session: Session):
+    # This automatically emits SAVEPOINT / RELEASE SAVEPOINT
+    with session.begin_nested():
+        session.execute(text("INSERT INTO categories VALUES (1, 'Tech');"))
+        session.execute(text("INSERT INTO categories VALUES (2, 'Life');"))
+        
+    try:
+        with session.begin_nested():
+            # TetoDB requires POSITIONAL values. Do not target columns.
+            session.execute(text("INSERT INTO posts VALUES (1, 1, 'Hello World');"))
+    except Exception as e:
+        # The inner block cleanly rolls back to its savepoint.
+        # The categories from the first block are STILL safely staged!
+        pass 
+        
+    session.commit()
+```
 
-## Important Notes & Gotchas
+### 6. Critical SQL Gotchas
 
-### Database Files & Storage
-- TetoDB creates a **dedicated folder** named `data_<dbname>/` containing all files for that database.
-- **Do not delete these files while the server is running.** You will corrupt your data.
-- To start fresh, stop the server and delete the entire `data_<dbname>/` folder.
-- To reopen an existing database, just start the server with the same name — ARIES recovery replays the WAL automatically.
-
-### Table Creation
-- `CREATE TABLE` must specify column types explicitly. Supported types: `INTEGER`, `BIGINT`, `SMALLINT`, `TINYINT`, `BOOLEAN`, `DECIMAL`/`FLOAT`/`DOUBLE`, `VARCHAR`/`TEXT`, `CHAR`, `TIMESTAMP`/`DATE`.
-- `Base.metadata.create_all(engine)` (SQLAlchemy auto-create) is **not supported**. You must create tables with explicit `CREATE TABLE` SQL statements.
-
-### INSERT Syntax
-- TetoDB requires **positional VALUES only** — you cannot specify column names in INSERT.
-  ```sql
-  -- CORRECT
-  INSERT INTO users VALUES (1, 'Alice');
-
-  -- NOT SUPPORTED
-  INSERT INTO users (id, name) VALUES (1, 'Alice');
-  ```
-
-### Query Features (Current)
-- Supported core statements include `SELECT`, `INSERT`, `UPDATE`, `DELETE`, `CREATE TABLE`, `DROP TABLE`, `CREATE INDEX`, and `DROP INDEX`.
-- Aggregates include `COUNT(*)`, `COUNT(expr)`, `SUM`, `MIN`, `MAX`, `AVG`, and `MEDIAN`. (Empty table aggregates properly return 0 or NULL).
-- Built-in string matching via `LIKE`/`ILIKE` uses safe iterative backtracking (no stack overflow risk).
-- `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`/`OFFSET`, `JOIN`, `IN`, CTEs (`WITH`), and set operations (`UNION`, `INTERSECT`, `EXCEPT`) are available.
-- `EXPLAIN` is available for inspecting plans.
-
-### Transactions
-- TetoDB supports `BEGIN`, `COMMIT`, and `ROLLBACK`.
-- Without an explicit `BEGIN`, each statement runs in **autocommit mode**.
-- If a statement fails inside a transaction, the transaction becomes **poisoned** — all subsequent statements are rejected until you `COMMIT` (which auto-rollbacks) or `ROLLBACK`.
-- **Savepoints are fully supported**: `SAVEPOINT <name>`, `RELEASE SAVEPOINT <name>`, and `ROLLBACK TO <name>` work within an active transaction. `ROLLBACK TO` undoes all operations back to the savepoint and clears the poisoned state, allowing the transaction to continue. Locks are NOT released on `ROLLBACK TO` (standard SQL behavior).
-
-### Concurrency
-- TetoDB uses **Strict Two-Phase Locking (2PL)** for transaction isolation.
-- Multiple clients can connect simultaneously, but heavy write contention on the same rows may cause lock waits or aborts.
-- Background checkpointing runs every 5 seconds.
-
-### SQLAlchemy Limitations (READ THIS)
-Because TetoDB is a core engine without full PostgreSQL feature bloat, you must configure SQLAlchemy appropriately:
-
-- **Nested Transactions (Savepoints)**: `session.begin_nested()` is supported! TetoDB implements `SAVEPOINT`, `RELEASE SAVEPOINT`, and `ROLLBACK TO SAVEPOINT`. Partial rollbacks undo data mutations but do not release locks.
-- **Positional INSERTS Only**: TetoDB requires `INSERT INTO table VALUES (...)` rather than column targeting.
-- **Reflection is limited**: `get_table_names()` returns an empty list since TetoDB doesn't have `information_schema`. The `has_table()` method works by probing with `SELECT ... LIMIT 0`.
-- **No ALTER TABLE**: Schema modifications after creation are not supported.
-- **No auto-increment**: Primary keys must be provided explicitly. TetoDB has no sequences.
-- **Parameter style**: The driver uses client-side `?` parameter substitution. Values are safely escaped (including single quotes).
-- **Data Types**: `TIMESTAMP` accepts strings formatted as `'YYYY-MM-DD'` or `'YYYY-MM-DD HH:MM:SS'` and uses 64-bit UTC epoch storage internally.
-
-### Web App Compatibility Notes (FastAPI + SQLAlchemy)
-- For startup migrations/seeding in demo apps, prefer small idempotent SQL statements and explicit error handling; if a statement fails in a transaction, issue `ROLLBACK` before continuing.
-- Avoid assuming `DROP TABLE IF EXISTS` support; emulate it by attempting `DROP TABLE` and ignoring "table not found" errors.
-- For portability across current builds, use explicit `CREATE UNIQUE INDEX ...` statements instead of relying only on inline `UNIQUE` column constraints.
-- If your app uses optional foreign keys, validate parent existence before insert/update and ensure nullable FK handling matches your server build behavior.
-- Browser CORS errors often mask backend `500` errors. Check backend logs first; once the API returns `2xx`, CORS headers are emitted normally by FastAPI middleware.
+* **Positional INSERT Only**: You cannot specify columns in INSERT. `INSERT INTO users (id, name)` will fail. You must use `INSERT INTO users VALUES (?, ?);`.
+* **String Datatypes**: Boolean values are accepted as `TRUE` or `FALSE`. Timestamps are accepted as strings exactly matching `'YYYY-MM-DD HH:MM:SS'`.
+* **Database Cleanup**: Do not delete TetoDB files manually while the server runs. To reset the DB entirely, stop the `teto_main.exe` process and delete the `data_<dbname>` folder.
+* **Corrupted API States**: If your web API suddenly returns `500` continuously on all endpoints, a buggy request likely threw an unhandled DB exception and failed to call `session.rollback()`, leaving your connection pool holding a locked, uncommitted transaction. Restart your API server to reset the connections!
 
 ### Performance Tips
 - Create **indexes** on columns you frequently filter by: `CREATE INDEX idx_name ON table (column);`

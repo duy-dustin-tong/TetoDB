@@ -1,7 +1,0 @@
-Metadata-Version: 2.4
-Name: tetodb
-Version: 1.0.0
-Summary: TetoDB Python Driver and SQLAlchemy Dialect
-Requires-Dist: sqlalchemy>=2.0
-Dynamic: requires-dist
-Dynamic: summary

@@ -1,7 +1,0 @@
-{
-    "C_Cpp.diagnostics.unusedIncludes": "none",
-    "C_Cpp.intelliSenseEngine": "disabled",
-    "clangd.checkUpdate": false,
-    "C_Cpp.diagnostics.level": "Error",
-    "editor.diagnosticDecoration": "error"
-}

@@ -22,6 +22,7 @@ namespace tetodb {
             case TypeId::INTEGER: return 4;
             case TypeId::BIGINT: return 8;
             case TypeId::DECIMAL: return 8;
+            case TypeId::TIMESTAMP: return 8;
             default: return 0;
             }
         }
@@ -124,6 +125,7 @@ namespace tetodb {
     static NumberType kBigInt(TypeId::BIGINT);
     static NumberType kDecimal(TypeId::DECIMAL);
     static NumberType kBoolean(TypeId::BOOLEAN);
+    static NumberType kTimestamp(TypeId::TIMESTAMP);
     static CharType    kChar;
     static VarcharType kVarchar;
 
@@ -134,6 +136,7 @@ namespace tetodb {
         case TypeId::INTEGER: return &kInteger;
         case TypeId::BIGINT: return &kBigInt;
         case TypeId::DECIMAL: return &kDecimal;
+        case TypeId::TIMESTAMP: return &kTimestamp;
         case TypeId::BOOLEAN: return &kBoolean;
         case TypeId::CHAR:    return &kChar;
         case TypeId::VARCHAR: return &kVarchar;

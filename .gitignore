@@ -25,9 +25,9 @@
 # ========================
 # Build Artifacts
 # ========================
-/build/
-/out/
-/CMakeFiles/
+build/
+out/
+CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 build.ninja
@@ -44,6 +44,9 @@ compile_commands.json
 *.dll
 *.dylib
 *.exe
+*.pdb
+*.ilk
+*.exp
 
 # ========================
 # Database Runtime Files
@@ -55,16 +58,21 @@ compile_commands.json
 *.freelist
 *.catalog
 data_*/
+todoapp
+todoapp.catalog
+todoapp.log
 
 # ========================
 # IDE & Editor
 # ========================
-/.vs/
-/.vscode/
-/.cache/
+.vs/
+.vscode/
+.cache/
+.clangd/
 *.swp
 *.swo
 *~
+*.idx
 
 # ========================
 # Python
@@ -75,11 +83,16 @@ __pycache__/
 *.egg-info/
 .venv/
 dist/
+python/.venv/
 
 # ========================
 # Node.js (webapp)
 # ========================
 node_modules/
+**/node_modules/
+tetodb_todo_webapp/frontend/node_modules/
+todo-app/frontend/node_modules/
+todo-app/frontend/dist/
 
 # ========================
 # OS Files
@@ -93,6 +106,7 @@ Thumbs.db
 *.tmp
 test.sql
 test_free.sql
+git_tracked_files.txt
 
 # ========================
 # Whitelist
