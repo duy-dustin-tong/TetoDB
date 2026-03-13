@@ -1,3 +1,0 @@
-fastapi
-uvicorn[standard]
-sqlalchemy>=2.0

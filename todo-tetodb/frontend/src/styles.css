@@ -1,0 +1,264 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;600;700&display=swap");
+
+:root {
+  --bg-top: #f2efe7;
+  --bg-bottom: #d8e3d3;
+  --panel: #fffdf8;
+  --ink: #1d2b28;
+  --muted: #53615d;
+  --accent: #0f766e;
+  --accent-soft: #cbe7e4;
+  --danger: #b91c1c;
+  --line: #cfd9d5;
+  --shadow: 0 12px 30px rgba(31, 41, 39, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--ink);
+  font-family: "Manrope", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 20% 10%, #ffffff 0%, transparent 35%),
+    radial-gradient(circle at 80% 0%, #e8f0d9 0%, transparent 40%),
+    linear-gradient(155deg, var(--bg-top), var(--bg-bottom));
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  width: min(1080px, 92vw);
+  margin: 0 auto;
+  padding: 28px 0 42px;
+}
+
+.hero {
+  margin-bottom: 16px;
+  animation: rise 0.45s ease-out;
+}
+
+.kicker {
+  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.hero h1 {
+  margin: 6px 0;
+  font: 700 2.3rem/1.06 "Fraunces", Georgia, serif;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 14px;
+  animation: rise 0.45s ease-out;
+}
+
+.create-list-panel {
+  margin: 14px 0;
+}
+
+.inline-form {
+  display: flex;
+  gap: 10px;
+}
+
+.grid-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 290px) 1fr;
+  gap: 14px;
+}
+
+.panel-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px dashed var(--line);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+}
+
+h2 {
+  margin: 0;
+  font: 700 1.2rem/1.2 "Fraunces", Georgia, serif;
+}
+
+input,
+select,
+button {
+  font: inherit;
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid #b8c6c2;
+  border-radius: 10px;
+  padding: 9px 11px;
+  color: var(--ink);
+  background: #fffffc;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid #98c6be;
+  outline-offset: 1px;
+}
+
+button {
+  border: none;
+  background: var(--accent);
+  color: white;
+  border-radius: 10px;
+  cursor: pointer;
+  padding: 9px 12px;
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.list-stack,
+.todo-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.list-item {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8faf7;
+  border: 1px solid #d5dfdb;
+  color: var(--ink);
+}
+
+.list-item.active {
+  background: linear-gradient(140deg, #d5ebe8, #edf7f6);
+  border-color: #8ebdb7;
+}
+
+.stats-row {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid #c7d8d3;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: var(--accent-soft);
+  color: #134e4a;
+  font-size: 0.86rem;
+}
+
+.todo-form {
+  display: grid;
+  grid-template-columns: 1fr 90px 200px 100px;
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.todo-card {
+  display: grid;
+  grid-template-columns: 70px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #d7e2de;
+  border-radius: 12px;
+  padding: 8px;
+  background: #ffffff;
+}
+
+.todo-card.done {
+  background: #eef4ef;
+}
+
+.check-btn {
+  background: #14532d;
+}
+
+.todo-card.done .check-btn {
+  background: #166534;
+}
+
+.todo-main h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.todo-main p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.ghost-btn {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid #e8c6c6;
+}
+
+.muted {
+  margin: 6px 0;
+  color: var(--muted);
+}
+
+.error-box {
+  margin: 12px 0;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+@media (max-width: 920px) {
+  .grid-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .todo-form {
+    grid-template-columns: 1fr;
+  }
+
+  .todo-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
