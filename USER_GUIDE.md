@@ -259,7 +259,6 @@ Because TetoDB is a core engine without full PostgreSQL feature bloat, you must 
 - **Reflection is limited**: `get_table_names()` returns an empty list since TetoDB doesn't have `information_schema`. The `has_table()` method works by probing with `SELECT ... LIMIT 0`.
 - **No ALTER TABLE**: Schema modifications after creation are not supported.
 - **No auto-increment**: Primary keys must be provided explicitly. TetoDB has no sequences.
-- **No DEALLOCATE**: Connection pooling tools trying to deallocate prepared statements will receive an error.
 - **Parameter style**: The driver uses client-side `?` parameter substitution. Values are safely escaped (including single quotes).
 - **Data Types**: `TIMESTAMP` accepts strings formatted as `'YYYY-MM-DD'` or `'YYYY-MM-DD HH:MM:SS'` and uses 64-bit UTC epoch storage internally.
 

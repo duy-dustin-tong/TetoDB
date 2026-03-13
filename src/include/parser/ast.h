@@ -24,7 +24,6 @@ enum class ASTNodeType {
   TRANSACTION_STATEMENT,
   EXPLAIN_STATEMENT,
   SAVEPOINT_STATEMENT,
-  DEALLOCATE_STATEMENT,
   COLUMN_REF,
   CONSTANT,
   BINARY_EXPR,
@@ -641,18 +640,6 @@ struct SavepointStatement : public ASTNode {
       break;
     }
     return Indent(indent) + "[[ " + cmd_str + ": " + name_ + " ]]\n";
-  }
-};
-
-struct DeallocateStatement : public ASTNode {
-  std::string name_;
-
-  DeallocateStatement(std::string name) : name_(std::move(name)) {
-    type_ = ASTNodeType::DEALLOCATE_STATEMENT;
-  }
-
-  std::string ToString(int indent = 0) const override {
-    return Indent(indent) + "[[ DEALLOCATE: " + name_ + " ]]\n";
   }
 };
 

@@ -195,7 +195,6 @@ ROLLBACK;
 Because TetoDB is a lightweight engine, certain standard SQL features commonly used by ORMs like SQLAlchemy are **explicitly not supported**. Attempting to use them will result in a `std::runtime_error`.
 
 1. **No Nested Transactions / Savepoints:** `SAVEPOINT`, `RELEASE SAVEPOINT`, and `ROLLBACK TO SAVEPOINT` are not supported and will throw an error. SQLAlchemy's `session.begin_nested()` will not work.
-2. **No Prepared Statement Deallocation:** The `DEALLOCATE` command is not supported.
 3. **No ALTER TABLE:** Schema modifications after creation are not supported.
 4. **No Auto-Increment Sequences:** TetoDB does not automatically generate primary keys. You must insert PKs manually.
 5. **Positional INSERTs Only:** `INSERT INTO table (col) VALUES (val)` is not supported; you must use `INSERT INTO table VALUES (val1, val2, ...)`.

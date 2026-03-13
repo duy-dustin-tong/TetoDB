@@ -129,11 +129,6 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
       throw std::runtime_error("Savepoints are not supported");
     }
 
-    // Deallocate: throw unsupported error instead of silently returning success
-    if (ast->type_ == ASTNodeType::DEALLOCATE_STATEMENT) {
-      throw std::runtime_error("DEALLOCATE is not supported");
-    }
-
     if (session.is_poisoned)
       throw std::runtime_error(
           "current transaction is aborted, commands ignored until end "

@@ -133,17 +133,6 @@ std::unique_ptr<ASTNode> Parser::ParseStatement() {
     return std::make_unique<SavepointStatement>(SavepointCmd::RELEASE, sp_name);
   }
 
-  if (Peek().value_ == "DEALLOCATE") {
-    Advance();
-    // DEALLOCATE ALL or DEALLOCATE <name>
-    if (Peek().type_ == TokenType::IDENTIFIER ||
-        Peek().type_ == TokenType::STRING || Peek().value_ == "ALL") {
-      std::string name = Advance().value_;
-      return std::make_unique<DeallocateStatement>(name);
-    }
-    return std::make_unique<DeallocateStatement>("ALL");
-  }
-
   throw std::runtime_error("Syntax Error: Unknown statement type '" +
                            Peek().value_ + "'");
 }

@@ -16,7 +16,7 @@ const std::unordered_set<std::string> Lexer::keywords_ = {
     "INDEX",      "UNIQUE",     "PRIMARY", "KEY",       "FOREIGN",
     "REFERENCES", "CASCADE",    "LIKE",    "ILIKE",     "BEGIN",
     "COMMIT",     "ROLLBACK",   "DROP",    "EXPLAIN",   "SAVEPOINT",
-    "RELEASE",    "DEALLOCATE", "TO",      "ALL",       "NULL",
+    "RELEASE",    "TO",         "ALL",     "NULL",
     "IS",         "NOT",        "BOOLEAN", "DECIMAL",   "FLOAT",
     "DATE",       "TIMESTAMP",  "TRUE",    "FALSE",     "RESTRICT",
     "MIN",        "MAX",        "ORDER",   "ASC",       "DESC",
