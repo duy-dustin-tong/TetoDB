@@ -1,0 +1,296 @@
+// recovery_manager.cpp
+
+#include "recovery/recovery_manager.h"
+#include "storage/page/page_guard.h"
+#include <cstring>
+#include <iostream>
+#include <vector>
+
+namespace tetodb {
+
+void RecoveryManager::Redo() {
+  std::ifstream log_file(log_file_name_, std::ios::binary);
+  if (!log_file.is_open()) {
+    std::cout << "[RECOVERY] No log file found. Starting fresh." << std::endl;
+    return;
+  }
+
+  std::cout << "[RECOVERY] Phase 1 & 2: Analysis and Redo Started..."
+            << std::endl;
+  uint32_t offset = 0;
+  lsn_t max_lsn = INVALID_LSN;
+
+  while (true) {
+    // 1. Peek at the first 4 bytes (the size of the record)
+    uint32_t record_size;
+    char size_buf[sizeof(uint32_t)];
+    if (!log_file.read(size_buf, sizeof(uint32_t))) {
+      break; // Clean EOF
+    }
+    std::memcpy(&record_size, size_buf, sizeof(uint32_t));
+
+    // ==========================================
+    // FIX 1: PARTIAL CRASH WRITE PROTECTION
+    // ==========================================
+    // If the power was cut mid-write, the record size will be garbage.
+    // Minimum log header is 20 bytes. Max is roughly PAGE_SIZE.
+    if (record_size < 20 || record_size > PAGE_SIZE * 2) {
+      std::cout << "[RECOVERY] Encountered partial/corrupted log record at end "
+                   "of file. Halting Analysis."
+                << std::endl;
+      break;
+    }
+
+    std::vector<char> buffer(record_size);
+    std::memcpy(buffer.data(), &record_size, sizeof(uint32_t));
+
+    // If the payload is truncated, read will fail safely
+    if (!log_file.read(buffer.data() + sizeof(uint32_t),
+                       record_size - sizeof(uint32_t))) {
+      std::cout << "[RECOVERY] Log payload truncated. Halting Analysis."
+                << std::endl;
+      break;
+    }
+
+    LogRecord log_record;
+    log_record.Deserialize(buffer.data());
+
+    lsn_mapping_[log_record.GetLSN()] = offset;
+    max_lsn = std::max(max_lsn, log_record.GetLSN());
+    did_work_ = true;
+
+    if (log_record.GetTxnId() != INVALID_TRANSACTION_ID) {
+      if (log_record.GetLogRecordType() == LogRecordType::COMMIT ||
+          log_record.GetLogRecordType() == LogRecordType::ABORT) {
+        active_txn_.erase(log_record.GetTxnId());
+      } else {
+        active_txn_[log_record.GetTxnId()] = log_record.GetLSN();
+      }
+    }
+
+    RID rid = log_record.GetTargetRID();
+    LogRecordType type = log_record.GetLogRecordType();
+
+    if (type == LogRecordType::NEWPAGE) {
+      page_id_t new_page_id = rid.GetPageId();
+      page_id_t prev_page_id = log_record.GetPrevPageId();
+
+      Page *new_page = bpm_->FetchPage(new_page_id);
+      if (new_page != nullptr) {
+        WritePageGuard guard(bpm_, new_page);
+        auto table_page = guard.As<TablePage>();
+        if (table_page->GetFreeSpacePointer() == 0 ||
+            table_page->GetLSN() < log_record.GetLSN()) {
+          table_page->Init(new_page_id, PAGE_SIZE, prev_page_id,
+                           log_record.GetLSN());
+          guard.MarkDirty();
+        }
+      }
+
+      if (prev_page_id != INVALID_PAGE_ID) {
+        Page *prev_page = bpm_->FetchPage(prev_page_id);
+        if (prev_page != nullptr) {
+          WritePageGuard guard(bpm_, prev_page);
+          auto table_page = guard.As<TablePage>();
+          if (table_page->GetFreeSpacePointer() == 0 ||
+              table_page->GetFreeSpacePointer() > PAGE_SIZE ||
+              table_page->GetSlotCount() > PAGE_SIZE ||
+              table_page->GetLSN() < log_record.GetLSN()) {
+            if (table_page->GetFreeSpacePointer() == 0 ||
+                table_page->GetFreeSpacePointer() > PAGE_SIZE ||
+                table_page->GetSlotCount() > PAGE_SIZE) {
+              table_page->Init(prev_page_id, PAGE_SIZE);
+            }
+            table_page->SetNextPageId(new_page_id);
+            table_page->SetLSN(log_record.GetLSN());
+            guard.MarkDirty();
+          }
+        }
+      }
+    } else if (type == LogRecordType::INSERT ||
+               type == LogRecordType::MARKDELETE ||
+               type == LogRecordType::ROLLBACKDELETE ||
+               type == LogRecordType::APPLYDELETE ||
+               type == LogRecordType::UPDATE) {
+
+      Page *page = bpm_->FetchPage(rid.GetPageId());
+      if (page != nullptr) {
+        WritePageGuard guard(bpm_, page);
+        auto table_page = guard.As<TablePage>();
+
+        // Detect uninitialized pages or recycled B-Tree pages with garbage
+        // metadata
+        if (table_page->GetFreeSpacePointer() == 0 ||
+            table_page->GetFreeSpacePointer() > PAGE_SIZE ||
+            table_page->GetSlotCount() > PAGE_SIZE) {
+          table_page->Init(rid.GetPageId(), PAGE_SIZE);
+        }
+
+        if (table_page->GetLSN() >= log_record.GetLSN()) {
+          // Skip stale log
+        } else {
+          if (type == LogRecordType::INSERT) {
+            // Because we replay logs in exact chronological order,
+            // standard insertion will perfectly recreate the original RIDs.
+            RID temp_rid;
+            table_page->InsertTuple(log_record.GetNewTuple(), &temp_rid);
+          } else if (type == LogRecordType::MARKDELETE) {
+            table_page->MarkDelete(rid);
+          } else if (type == LogRecordType::ROLLBACKDELETE) {
+            table_page->RollbackDelete(rid, log_record.GetNewTuple());
+          } else if (type == LogRecordType::APPLYDELETE) {
+            table_page->ApplyDelete(rid);
+          } else if (type == LogRecordType::UPDATE) {
+            Tuple dummy_old_tuple;
+            table_page->UpdateTuple(log_record.GetNewTuple(), &dummy_old_tuple, rid);
+          }
+
+          table_page->SetLSN(log_record.GetLSN());
+          guard.MarkDirty();
+        }
+      }
+    }
+    offset += record_size;
+  }
+
+  log_file.close();
+
+  if (max_lsn != INVALID_LSN) {
+    log_mgr_->SetNextLSN(max_lsn + 1);
+  }
+
+  std::cout << "[RECOVERY] Redo Complete." << std::endl;
+  std::cout << "[RECOVERY] Found " << active_txn_.size()
+            << " active (loser) transactions." << std::endl;
+}
+
+void RecoveryManager::Undo() {
+  if (active_txn_.empty()) {
+    std::cout << "[RECOVERY] No active transactions to undo. Database is clean."
+              << std::endl;
+    return;
+  }
+
+  std::cout << "[RECOVERY] Phase 3: Undo Started..." << std::endl;
+
+  std::ifstream log_file(log_file_name_, std::ios::binary);
+
+  for (auto const &[txn_id, last_lsn] : active_txn_) {
+    lsn_t current_lsn = last_lsn;
+    std::cout << " -> Rolling back incomplete Transaction " << txn_id
+              << std::endl;
+
+    while (current_lsn != INVALID_LSN) {
+      auto offset_it = lsn_mapping_.find(current_lsn);
+      if (offset_it == lsn_mapping_.end()) {
+        std::cerr << "[RECOVERY ERROR] Missing LSN " << current_lsn
+                  << " in mapping!" << std::endl;
+        break;
+      }
+
+      uint32_t offset = offset_it->second;
+      log_file.seekg(offset);
+      uint32_t record_size;
+      char size_buf[sizeof(uint32_t)];
+      log_file.read(size_buf, sizeof(uint32_t));
+      std::memcpy(&record_size, size_buf, sizeof(uint32_t));
+
+      std::vector<char> buffer(record_size);
+      std::memcpy(buffer.data(), &record_size, sizeof(uint32_t));
+      log_file.read(buffer.data() + sizeof(uint32_t),
+                    record_size - sizeof(uint32_t));
+
+      LogRecord log_record;
+      log_record.Deserialize(buffer.data());
+
+      RID rid = log_record.GetTargetRID();
+      LogRecordType type = log_record.GetLogRecordType();
+
+      if (log_record.IsCLR()) {
+        std::cout << "[UNDO TRACE] Skipping CLR LSN: " << current_lsn
+                  << " | Jumping to UndoNextLSN: "
+                  << log_record.GetUndoNextLSN() << std::endl;
+        current_lsn = log_record.GetUndoNextLSN();
+        continue;
+      }
+
+      std::cout << "[UNDO TRACE] LSN: " << current_lsn
+                << " | Type: " << static_cast<int>(type) << " | Target: Page "
+                << rid.GetPageId() << ", Slot " << rid.GetSlotId() << std::endl;
+
+      if (type == LogRecordType::INSERT) {
+        // 1. Emit CLR
+        LogRecord clr_record(txn_id, active_txn_[txn_id],
+                             LogRecordType::APPLYDELETE, rid,
+                             log_record.GetNewTuple());
+        clr_record.SetCLR(true);
+        clr_record.SetUndoNextLSN(log_record.GetPrevLSN());
+        lsn_t clr_lsn = log_mgr_->AppendLogRecord(&clr_record);
+        active_txn_[txn_id] = clr_lsn; // Update tip to the CLR
+
+        // 2. Physical Undo
+        Page *page = bpm_->FetchPage(rid.GetPageId());
+        if (page != nullptr) {
+          WritePageGuard guard(bpm_, page);
+          auto table_page = guard.As<TablePage>();
+          table_page->ApplyDelete(rid);
+          guard.MarkDirty();
+        }
+      } else if (type == LogRecordType::MARKDELETE) {
+        // 1. Emit CLR
+        LogRecord clr_record(txn_id, active_txn_[txn_id],
+                             LogRecordType::ROLLBACKDELETE, rid,
+                             log_record.GetNewTuple());
+        clr_record.SetCLR(true);
+        clr_record.SetUndoNextLSN(log_record.GetPrevLSN());
+        lsn_t clr_lsn = log_mgr_->AppendLogRecord(&clr_record);
+        active_txn_[txn_id] = clr_lsn; // Update tip to the CLR
+
+        // 2. Physical Undo
+        Page *page = bpm_->FetchPage(rid.GetPageId());
+        if (page != nullptr) {
+          WritePageGuard guard(bpm_, page);
+          auto table_page = guard.As<TablePage>();
+          table_page->RollbackDelete(rid, log_record.GetNewTuple());
+          guard.MarkDirty();
+        }
+      } else if (type == LogRecordType::UPDATE) {
+        // 1. Emit CLR
+        LogRecord clr_record(txn_id, active_txn_[txn_id],
+                             LogRecordType::UPDATE, rid,
+                             log_record.GetNewTuple(),
+                             log_record.GetOldTuple());
+        clr_record.SetCLR(true);
+        clr_record.SetUndoNextLSN(log_record.GetPrevLSN());
+        lsn_t clr_lsn = log_mgr_->AppendLogRecord(&clr_record);
+        active_txn_[txn_id] = clr_lsn; // Update tip to the CLR
+
+        // 2. Physical Undo
+        Page *page = bpm_->FetchPage(rid.GetPageId());
+        if (page != nullptr) {
+          WritePageGuard guard(bpm_, page);
+          auto table_page = guard.As<TablePage>();
+          Tuple dummy_old_tuple;
+          table_page->UpdateTuple(log_record.GetOldTuple(), &dummy_old_tuple, rid);
+          guard.MarkDirty();
+        }
+      } else if (type == LogRecordType::NEWPAGE) {
+        // Do nothing. Structural changes are not logically undone.
+      }
+
+      current_lsn = log_record.GetPrevLSN();
+    } // End of Transaction Undo Loop
+
+    // Formally terminate the transaction so it isn't an active loser
+    // on subsequent crash recoveries.
+    LogRecord abort_record(txn_id, active_txn_[txn_id], LogRecordType::ABORT);
+    log_mgr_->AppendLogRecord(&abort_record);
+  }
+
+  log_file.close();
+  std::cout << "[RECOVERY] Undo Complete. Database is fully ACID compliant and "
+               "ready for queries!"
+            << std::endl;
+}
+
+} // namespace tetodb

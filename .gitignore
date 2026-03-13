@@ -1,11 +1,95 @@
+
+
+# ========================
+# Build Artifacts
+# ========================
+build/
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+build.ninja
+.ninja_deps
+.ninja_log
+compile_commands.json
+
+# Compiled objects & libraries
+*.obj
+*.o
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
 *.exe
+*.pdb
+*.ilk
+*.exp
+
+# ========================
+# Database Runtime Files
+# ========================
 *.db
+*.log
 *.teto
 *.btree
-*.txt
-!CMakeLists.txt
-/.vs
-/out
-/build
-*.tmp
+*.freelist
+*.catalog
+data_*/
+todoapp
+todoapp.catalog
+todoapp.log
 
+# ========================
+# IDE & Editor
+# ========================
+.vs/
+.vscode/
+.cache/
+.clangd/
+*.swp
+*.swo
+*~
+*.idx
+
+# ========================
+# Python
+# ========================
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+dist/
+python/.venv/
+
+# ========================
+# Node.js (webapp)
+# ========================
+node_modules/
+**/node_modules/
+tetodb_todo_webapp/frontend/node_modules/
+todo-app/frontend/node_modules/
+todo-app/frontend/dist/
+
+# ========================
+# OS Files
+# ========================
+Thumbs.db
+.DS_Store
+
+# ========================
+# Temp & Test artifacts
+# ========================
+*.tmp
+test.sql
+test_free.sql
+git_tracked_files.txt
+
+# ========================
+# Whitelist
+# ========================
+!CMakeLists.txt
+!TESTING_GUIDE.md
+!USER_GUIDE.md
+!SQL_SYNTAX.md
