@@ -136,4 +136,64 @@ void TransactionManager::GarbageCollect(txn_id_t txn_id) {
   txn_map_.erase(txn_id);
 }
 
+void TransactionManager::RollbackToSavepoint(Transaction *txn,
+                                             const std::string &savepoint_name) {
+  Savepoint *sp = txn->FindSavepoint(savepoint_name);
+  if (!sp) {
+    throw std::runtime_error("SAVEPOINT '" + savepoint_name + "' does not exist");
+  }
+
+  size_t target_table_size = sp->table_write_set_size;
+  size_t target_index_size = sp->index_write_set_size;
+
+  // ==========================================================
+  // 1. UNDO INDEX OPERATIONS (LIFO) back to savepoint
+  // ==========================================================
+  auto *index_write_set = txn->GetIndexWriteSet();
+  while (index_write_set->size() > target_index_size) {
+    auto &record = index_write_set->back();
+    if (record.wtype_ == WType::INSERT) {
+      record.index_->DeleteEntry(record.tuple_, record.rid_, txn);
+    } else if (record.wtype_ == WType::DELETE) {
+      record.index_->InsertEntry(record.tuple_, record.rid_, txn);
+    }
+    index_write_set->pop_back();
+  }
+
+  // ==========================================================
+  // 2. UNDO TABLE HEAP OPERATIONS (LIFO) back to savepoint
+  //    CRITICAL: Pass nullptr as txn to MarkDelete/RollbackDelete
+  //    to prevent them from appending new records to the write set
+  //    (which would cause an infinite loop).
+  // ==========================================================
+  auto *write_set = txn->GetWriteSet();
+  while (write_set->size() > target_table_size) {
+    auto &record = write_set->back();
+    if (record.wtype_ == WType::INSERT) {
+      record.table_heap_->MarkDelete(record.rid_, nullptr);
+    } else if (record.wtype_ == WType::DELETE) {
+      record.table_heap_->RollbackDelete(record.rid_, record.tuple_, nullptr);
+    } else if (record.wtype_ == WType::UPDATE) {
+      record.table_heap_->MarkDelete(record.rid_, nullptr);
+      record.table_heap_->RollbackDelete(record.tuple_.GetRid(), record.tuple_,
+                                         nullptr);
+    }
+    write_set->pop_back();
+  }
+
+  // ==========================================================
+  // 3. Remove this savepoint and all created after it
+  // ==========================================================
+  auto &savepoints = txn->GetSavepoints();
+  for (auto it = savepoints.begin(); it != savepoints.end(); ++it) {
+    if (it->name == savepoint_name) {
+      savepoints.erase(it, savepoints.end());
+      break;
+    }
+  }
+
+  // NOTE: Locks are NOT released. This is standard SQL behavior.
+  // The transaction state remains GROWING.
+}
+
 } // namespace tetodb

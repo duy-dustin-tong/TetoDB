@@ -14,7 +14,7 @@
 # - Escaped Single Quotes Supported ('O''Brien')
 # 
 # SQLALCHEMY / ORM LIMITATIONS (Must Read!):
-# - No Nested Transactions: SAVEPOINT, RELEASE, ROLLBACK TO throw explicit unsupported errors.
+# - SAVEPOINT Support: SAVEPOINT, RELEASE SAVEPOINT, ROLLBACK TO with partial rollback
 # - No DEALLOCATE support for prepared statements (throws error).
 # - Positional INSERTS Only: `INSERT INTO table VALUES (...)` (No column targeting).
 # - No Auto-Increment: Primary keys must be explicitly provided in inserts.
@@ -176,3 +176,10 @@ if(WIN32)
     target_link_libraries(test_like_bug shlwapi ws2_32)
 endif()
 add_test(NAME test_like_bug COMMAND test_like_bug)
+
+add_executable(test_savepoint test/test_savepoint.cpp)
+target_link_libraries(test_savepoint tetodb_lib GTest::gtest_main GTest::gtest)
+if(WIN32)
+    target_link_libraries(test_savepoint shlwapi ws2_32)
+endif()
+add_test(NAME test_savepoint COMMAND test_savepoint)

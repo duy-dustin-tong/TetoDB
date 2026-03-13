@@ -28,6 +28,7 @@ namespace tetodb {
         Transaction* Begin(IsolationLevel isolation_level = IsolationLevel::REPEATABLE_READ);
         void Commit(Transaction* txn);
         void Abort(Transaction* txn);
+        void RollbackToSavepoint(Transaction* txn, const std::string& savepoint_name);
         void GarbageCollect(txn_id_t txn_id);
 
     private:

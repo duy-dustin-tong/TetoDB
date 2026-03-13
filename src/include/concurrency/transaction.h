@@ -35,6 +35,16 @@ enum class TransactionState { GROWING, SHRINKING, COMMITTED, ABORTED };
  */
 enum class IsolationLevel { READ_UNCOMMITTED, REPEATABLE_READ, READ_COMMITTED };
 
+/**
+ * Savepoint: captures write-set sizes at creation time.
+ * ROLLBACK TO undoes operations back to these sizes.
+ */
+struct Savepoint {
+  std::string name;
+  size_t table_write_set_size;
+  size_t index_write_set_size;
+};
+
 class Transaction {
 public:
   explicit Transaction(txn_id_t txn_id, IsolationLevel isolation_level =
@@ -106,6 +116,35 @@ public:
     index_write_set_.push_back(write_record);
   }
 
+  // --- SAVEPOINT SUPPORT ---
+  void CreateSavepoint(const std::string &name) {
+    savepoints_.push_back(
+        {name, table_write_set_.size(), index_write_set_.size()});
+  }
+
+  /** Releases the named savepoint and all savepoints created after it.
+   *  Returns true if found, false otherwise. */
+  bool ReleaseSavepoint(const std::string &name) {
+    for (auto it = savepoints_.begin(); it != savepoints_.end(); ++it) {
+      if (it->name == name) {
+        savepoints_.erase(it, savepoints_.end());
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Finds the named savepoint. Returns nullptr if not found. */
+  Savepoint *FindSavepoint(const std::string &name) {
+    for (auto &sp : savepoints_) {
+      if (sp.name == name)
+        return &sp;
+    }
+    return nullptr;
+  }
+
+  std::vector<Savepoint> &GetSavepoints() { return savepoints_; }
+
 private:
   txn_id_t txn_id_;
 
@@ -125,6 +164,9 @@ private:
 
   std::list<TableWriteRecord> table_write_set_;
   std::list<IndexWriteRecord> index_write_set_;
+
+  // --- SAVEPOINT STACK ---
+  std::vector<Savepoint> savepoints_;
 };
 
 } // namespace tetodb

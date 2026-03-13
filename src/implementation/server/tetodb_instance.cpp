@@ -124,9 +124,28 @@ QueryResult TetoDBInstance::ExecuteQuery(const std::string &sql,
       return res;
     }
 
-    // Savepoints: throw unsupported error instead of silently returning success
+    // Savepoint handling: SAVEPOINT, RELEASE, ROLLBACK TO
     if (ast->type_ == ASTNodeType::SAVEPOINT_STATEMENT) {
-      throw std::runtime_error("Savepoints are not supported");
+      auto *sp_stmt = static_cast<SavepointStatement *>(ast.get());
+      if (!session.active_txn)
+        throw std::runtime_error(
+            "SAVEPOINT can only be used within a transaction");
+
+      if (sp_stmt->cmd_ == SavepointCmd::SAVEPOINT) {
+        session.active_txn->CreateSavepoint(sp_stmt->name_);
+        res.status_msg = "SAVEPOINT";
+      } else if (sp_stmt->cmd_ == SavepointCmd::RELEASE) {
+        if (!session.active_txn->ReleaseSavepoint(sp_stmt->name_)) {
+          throw std::runtime_error("SAVEPOINT '" + sp_stmt->name_ +
+                                   "' does not exist");
+        }
+        res.status_msg = "RELEASE";
+      } else if (sp_stmt->cmd_ == SavepointCmd::ROLLBACK_TO) {
+        txn_mgr_->RollbackToSavepoint(session.active_txn, sp_stmt->name_);
+        session.is_poisoned = false;
+        res.status_msg = "ROLLBACK";
+      }
+      return res;
     }
 
     if (session.is_poisoned)

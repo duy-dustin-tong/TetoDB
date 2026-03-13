@@ -244,7 +244,7 @@ tetodb://host:port/database
 - TetoDB supports `BEGIN`, `COMMIT`, and `ROLLBACK`.
 - Without an explicit `BEGIN`, each statement runs in **autocommit mode**.
 - If a statement fails inside a transaction, the transaction becomes **poisoned** — all subsequent statements are rejected until you `COMMIT` (which auto-rollbacks) or `ROLLBACK`.
-- Nested transactions (`SAVEPOINT`, `RELEASE SAVEPOINT`, `ROLLBACK TO SAVEPOINT`) are **NOT supported** and explicitly throw errors. Provide this information to SQLAlchemy (e.g., do not use `session.begin_nested()`).
+- **Savepoints are fully supported**: `SAVEPOINT <name>`, `RELEASE SAVEPOINT <name>`, and `ROLLBACK TO <name>` work within an active transaction. `ROLLBACK TO` undoes all operations back to the savepoint and clears the poisoned state, allowing the transaction to continue. Locks are NOT released on `ROLLBACK TO` (standard SQL behavior).
 
 ### Concurrency
 - TetoDB uses **Strict Two-Phase Locking (2PL)** for transaction isolation.
@@ -254,7 +254,7 @@ tetodb://host:port/database
 ### SQLAlchemy Limitations (READ THIS)
 Because TetoDB is a core engine without full PostgreSQL feature bloat, you must configure SQLAlchemy appropriately:
 
-- **No Nested Transactions**: Do not use `session.begin_nested()`. Savepoints throw missing feature errors.
+- **Nested Transactions (Savepoints)**: `session.begin_nested()` is supported! TetoDB implements `SAVEPOINT`, `RELEASE SAVEPOINT`, and `ROLLBACK TO SAVEPOINT`. Partial rollbacks undo data mutations but do not release locks.
 - **Positional INSERTS Only**: TetoDB requires `INSERT INTO table VALUES (...)` rather than column targeting.
 - **Reflection is limited**: `get_table_names()` returns an empty list since TetoDB doesn't have `information_schema`. The `has_table()` method works by probing with `SELECT ... LIMIT 0`.
 - **No ALTER TABLE**: Schema modifications after creation are not supported.

@@ -14,7 +14,7 @@
 # - Escaped Single Quotes Supported ('O''Brien')
 # 
 # SQLALCHEMY / ORM LIMITATIONS (Must Read!):
-# - No Nested Transactions: SAVEPOINT, RELEASE, ROLLBACK TO throw explicit unsupported errors.
+# - SAVEPOINT Support: SAVEPOINT, RELEASE SAVEPOINT, ROLLBACK TO with partial rollback
 # - No DEALLOCATE support for prepared statements (throws error).
 # - Positional INSERTS Only: `INSERT INTO table VALUES (...)` (No column targeting).
 # - No Auto-Increment: Primary keys must be explicitly provided in inserts.
